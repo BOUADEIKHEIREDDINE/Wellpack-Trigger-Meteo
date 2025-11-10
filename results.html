@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trigger météo - Résultats</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    :root {
+      --white: #ffffff;
+      --dark: #0d1b2a;
+      --muted: #5b6373;
+      --border: rgba(13,27,42,0.12);
+      --accent: #f8a81e;
+      --accent-dark: #d68b0f;
+      --success: #34c759;
+      --error: #ef4444;
+      --card-bg: rgba(255,255,255,0.92);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(120deg, #0dbdd9 0%, #07a5d3 38%, #f4ae1c 100%);
+      color: var(--dark);
+      min-height: 100vh;
+    }
+
+    header {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 56px 24px 16px;
+      color: var(--white);
+    }
+
+    header h1 {
+      margin: 0 0 12px;
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+    }
+
+    header p {
+      margin: 0;
+      color: rgba(255,255,255,0.8);
+      max-width: 680px;
+      line-height: 1.6;
+    }
+
+    main {
+      max-width: 1100px;
+      margin: 0 auto 64px;
+      padding: 0 24px 48px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .summary-card {
+      background: var(--card-bg);
+      border-radius: 22px;
+      padding: 24px;
+      border: 1px solid rgba(255,255,255,0.3);
+      backdrop-filter: blur(6px);
+      box-shadow: 0 30px 60px rgba(13,27,42,0.18);
+    }
+
+    .summary-card h3 {
+      margin: 0 0 10px;
+      font-size: 15px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+    }
+
+    .summary-card .value {
+      font-size: 32px;
+      font-weight: 800;
+      color: var(--dark);
+    }
+
+    .summary-card .detail {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .alert {
+      margin-bottom: 28px;
+      background: rgba(255,255,255,0.85);
+      border-radius: 18px;
+      padding: 18px 20px;
+      border: 1px solid rgba(255,255,255,0.45);
+      box-shadow: 0 20px 45px rgba(13,27,42,0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .alert strong { color: var(--dark); }
+
+    .issues-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .stores-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 22px;
+    }
+
+    .store-card {
+      background: var(--card-bg);
+      border-radius: 24px;
+      padding: 26px;
+      border: 1px solid rgba(255,255,255,0.35);
+      box-shadow: 0 28px 55px rgba(13,27,42,0.2);
+      backdrop-filter: blur(8px);
+    }
+
+    .store-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 16px;
+    }
+
+    .store-title {
+      font-size: 22px;
+      font-weight: 700;
+      margin: 0;
+      color: var(--dark);
+    }
+
+    .store-meta {
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .status-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 999px;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 8px;
+    }
+
+    .status-success {
+      background: rgba(52,199,89,0.18);
+      color: var(--success);
+      border: 1px solid rgba(52,199,89,0.35);
+    }
+
+    .status-error {
+      background: rgba(239,68,68,0.18);
+      color: var(--error);
+      border: 1px solid rgba(239,68,68,0.35);
+    }
+
+    .conditions-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin: 18px 0;
+    }
+
+    .condition-chip {
+      background: rgba(13,27,42,0.06);
+      color: var(--dark);
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .window-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(248,168,30,0.14);
+      color: var(--accent-dark);
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      overflow: hidden;
+      border-radius: 18px;
+      border: 1px solid var(--border);
+    }
+
+    table thead {
+      background: rgba(13,27,42,0.08);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-size: 12px;
+    }
+
+    table th, table td {
+      padding: 14px 16px;
+      font-size: 14px;
+      text-align: left;
+      color: var(--dark);
+      border-bottom: 1px solid rgba(13,27,42,0.08);
+    }
+
+    table tr:last-child td { border-bottom: none; }
+
+    .tag-success {
+      color: var(--success);
+      font-weight: 600;
+    }
+
+    .tag-error {
+      color: var(--error);
+      font-weight: 600;
+    }
+
+    .footer-actions {
+      margin-top: 40px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .footer-actions a {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      padding: 14px 26px;
+      border-radius: 999px;
+      background: var(--dark);
+      color: var(--white);
+      font-weight: 600;
+      box-shadow: 0 20px 40px rgba(13,27,42,0.25);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .footer-actions a:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 24px 48px rgba(13,27,42,0.32);
+    }
+
+    @media (max-width: 720px) {
+      header h1 { font-size: 30px; }
+      .store-card { padding: 22px; }
+      table th, table td { font-size: 12px; padding: 12px; }
+      .conditions-chips { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+  <link rel="icon" href="data:," />
+}</head>
+<body>
+  <header>
+    <h1>Résultats de l’analyse météo</h1>
+    <p>Voici le statut détaillé des points de vente analysés. Les alertes déclenchées sont envoyées automatiquement aux contacts configurés.</p>
+  </header>
+
+  <main>
+    <section class="summary-grid">
+      <div class="summary-card">
+        <h3>Points de vente analysés</h3>
+        <div class="value">{{ summary.total }}</div>
+        <div class="detail">Analyse générée le {{ summary.generated_at }}</div>
+      </div>
+      <div class="summary-card">
+        <h3>Alertes déclenchées</h3>
+        <div class="value">{{ summary.alerts }}</div>
+        <div class="detail">Points de vente respectant 100% des conditions</div>
+      </div>
+      <div class="summary-card">
+        <h3>Emails envoyés</h3>
+        <div class="value">{{ summary.emails_sent }}</div>
+        {% if not summary.smtp_configured %}
+          <div class="detail" style="color: var(--error); font-weight:600;">Configuration SMTP manquante</div>
+        {% else %}
+          <div class="detail">Expéditeur : {{ summary.sender }}</div>
+        {% endif %}
+      </div>
+    </section>
+
+    {% if not summary.smtp_configured %}
+      <div class="alert">
+        <strong>⚠️ Notifications non envoyées :</strong>
+        <span>Renseignez les variables d’environnement <code>SMTP_EMAIL</code> et <code>SMTP_PASSWORD</code> pour activer l’envoi d’emails.</span>
+      </div>
+    {% endif %}
+
+    {% if issues %}
+      <div class="alert">
+        <strong>Points à vérifier avant une prochaine analyse :</strong>
+        <ul class="issues-list">
+          {% for issue in issues %}
+            <li>{{ issue }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <section class="stores-grid">
+      {% for store in stores %}
+        <article class="store-card">
+          <div class="store-header">
+            <h2 class="store-title">{{ store.label }}</h2>
+            <span class="store-meta">Email : {{ store.email }} · Code postal : {{ store.postal_code }}</span>
+            <span class="window-chip">Fenêtre : J-{{ store.window.avant }} à J+{{ store.window.apres }}</span>
+            <span class="status-chip {% if store.alert_triggered %}status-success{% else %}status-error{% endif %}">
+              {% if store.alert_triggered %}✔ Alerte déclenchée{% else %}✖ Conditions non réunies{% endif %}
+            </span>
+            <span class="status-chip {% if store.email_status.sent %}status-success{% else %}status-error{% endif %}">
+              {% if store.email_status.sent %}📨 Email envoyé{% else %}📨 {{ store.email_status.message }}{% endif %}
+            </span>
+          </div>
+
+          <div class="conditions-chips">
+            {% for condition in store.conditions %}
+              <span class="condition-chip">{{ condition.label }} : {{ condition.value }}</span>
+            {% endfor %}
+          </div>
+
+          {% if store.days %}
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Jour</th>
+                  <th>Temp (°C)</th>
+                  <th>Vent (km/h)</th>
+                  <th>Précip (mm)</th>
+                  <th>Statut</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for day in store.days %}
+                  <tr>
+                    <td>{{ day.date or "—" }}</td>
+                    <td>{{ day.jour or "—" }}</td>
+                    <td>{{ day.temp }}</td>
+                    <td>{{ day.vent }}</td>
+                    <td>{{ day.precip }}</td>
+                    <td>
+                      {% if day.error %}
+                        <span class="tag-error">{{ day.error }}</span>
+                      {% else %}
+                        <span class="{% if day.state %}tag-success{% else %}tag-error{% endif %}">
+                          {% if day.state %}Conforme{% else %}Non conforme{% endif %}
+                        </span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          {% else %}
+            <p style="color: var(--muted); font-size: 14px; margin-top: 12px;">Aucune donnée météo détaillée disponible pour ce point de vente.</p>
+          {% endif %}
+        </article>
+      {% endfor %}
+    </section>
+
+    <div class="footer-actions">
+      <a href="{{ url_for('index') }}">← Ajouter de nouveaux points de vente</a>
+    </div>
+  </main>
+</body>
+</html>
+
+

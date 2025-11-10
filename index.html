@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trigger météo - Configuration</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    :root {
+      --bg-white: #ffffff;
+      --bg-muted: #f7f8fb;
+      --text-dark: #1e1e1e;
+      --text-muted: #505968;
+      --border: #eaeaea;
+      --accent: #f8a81e;
+      --accent-dark: #d68b0f;
+      --midnight: #0d1b2a;
+      --success: #34c759;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(120deg, #0dbdd9 0%, #07a5d3 35%, #f4ae1c 100%);
+      color: var(--text-dark);
+      min-height: 100vh;
+    }
+
+    header {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 64px 24px 48px;
+    }
+
+    .hero-card {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, rgba(13, 27, 42, 0.94), rgba(13, 27, 42, 0.76));
+      border-radius: 28px;
+      padding: 48px 56px;
+      color: var(--bg-white);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 34px 70px rgba(13,27,42,0.32);
+    }
+
+    .hero-card::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at 20% 20%, rgba(12,191,217,0.45), transparent 55%), radial-gradient(circle at 80% 10%, rgba(248,168,30,0.35), transparent 45%);
+      pointer-events: none;
+    }
+
+    .hero-card h1 {
+      position: relative;
+      margin: 0;
+      font-size: 40px;
+      font-weight: 800;
+      letter-spacing: -0.6px;
+    }
+
+    .hero-card p {
+      position: relative;
+      margin: 0;
+      color: rgba(255,255,255,0.8);
+      max-width: 620px;
+      line-height: 1.65;
+    }
+
+    .badge-pill {
+      position: relative;
+      align-self: flex-start;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: rgba(248,168,30,0.16);
+      color: var(--accent);
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 13px;
+      letter-spacing: 0.4px;
+      text-transform: uppercase;
+    }
+
+    .hero-actions {
+      position: relative;
+      display: flex;
+      gap: 16px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+
+    .hero-actions .cta-primary {
+      background: #f8a81e;
+      color: #1e1e1e;
+      padding: 14px 28px;
+      border-radius: 999px;
+      font-weight: 700;
+      text-decoration: none;
+      box-shadow: 0 22px 48px rgba(248,168,30,0.45);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .hero-actions .cta-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 26px 56px rgba(248,168,30,0.55);
+    }
+
+    .hero-actions .cta-secondary {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(255,255,255,0.8);
+      text-decoration: none;
+      font-weight: 600;
+      border-bottom: 1px solid rgba(255,255,255,0.4);
+      padding-bottom: 4px;
+    }
+
+    .hero-actions .cta-secondary span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.12);
+    }
+
+    main {
+      max-width: 1040px;
+      margin: 0 auto 72px;
+      padding: 0 24px 48px;
+    }
+
+    .container {
+      position: relative;
+      background: linear-gradient(155deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.94) 48%, rgba(255,255,255,0.88) 100%);
+      border-radius: 28px;
+      padding: 44px 48px;
+      box-shadow: 0 34px 80px rgba(13,27,42,0.26);
+      border: 1px solid rgba(255,255,255,0.6);
+      backdrop-filter: blur(10px);
+      overflow: hidden;
+    }
+    .container::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at 20% -10%, rgba(13,189,217,0.18), transparent 60%), radial-gradient(circle at 110% 10%, rgba(248,168,30,0.16), transparent 55%);
+      z-index: 0;
+    }
+    .container > * { position: relative; z-index: 1; }
+
+    h2.section-title {
+      margin: 0 0 8px;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--midnight);
+    }
+
+    p.sub { margin: 0 0 24px; color: var(--text-muted); line-height: 1.5; }
+    form { margin-top: 24px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .field { margin-bottom: 16px; }
+    label { display: block; font-weight: 600; margin-bottom: 6px; color: var(--text-dark); }
+    input[type="text"], input[type="number"], select, input[type="email"] {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 14px;
+      font-size: 14px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      background: #fdfdfd;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(248,168,30,0.18);
+    }
+
+    .checkbox { display: flex; align-items: center; gap: 10px; margin: 16px 0 20px; padding: 12px 16px; background: rgba(248,168,30,0.08); border-radius: 14px; border: 1px solid rgba(248,168,30,0.18); }
+    .checkbox label { margin: 0; color: var(--midnight); font-weight: 500; }
+
+    .slider-group { background: linear-gradient(135deg, rgba(13,27,42,0.06), rgba(255,255,255,0.65)); border: 1px solid rgba(13,27,42,0.1); border-radius: 18px; padding: 24px 24px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.6); }
+    .slider { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; margin: 10px 0; }
+    input[type="range"] { width: 100%; }
+    .threshold-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+    .threshold-card {
+      border: 1px solid rgba(13,27,42,0.08);
+      border-radius: 20px;
+      padding: 20px;
+      background: linear-gradient(160deg, rgba(13,27,42,0.03), rgba(248,168,30,0.06));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 22px 38px rgba(13,27,42,0.12);
+    }
+    .threshold-card h3 { margin: 0 0 12px; font-size: 16px; color: var(--midnight); }
+    .threshold-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .threshold-card small { color: var(--text-muted); }
+
+    .entries-section { margin-top: 40px; border-top: 1px solid var(--border); padding-top: 28px; }
+    .entries-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin-top: 18px; }
+    .entry-card { background: rgba(255,255,255,0.9); border-radius: 20px; padding: 18px 20px; border: 1px solid rgba(13,27,42,0.08); box-shadow: 0 22px 45px rgba(13,27,42,0.12); backdrop-filter: blur(6px); position: relative; overflow: hidden; }
+    .entry-header { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+    .entry-title { font-weight: 700; font-size: 18px; color: var(--dark); margin: 0; }
+    .entry-sub { font-size: 13px; color: var(--muted); }
+    .entry-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .entry-badge { background: rgba(13,27,42,0.08); color: var(--dark); border-radius: 12px; padding: 6px 10px; font-size: 12px; font-weight: 600; }
+    .entry-metrics { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; font-size: 13px; color: var(--dark); }
+    .entry-metrics strong { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); }
+    .entry-actions-card { position: absolute; top: 14px; right: 18px; display: flex; gap: 10px; }
+    .entry-button { font-size: 13px; cursor: pointer; font-weight: 600; background: none; border: none; padding: 0; }
+    .entry-button.delete { color: #dc2626; }
+    .entry-button.edit { color: var(--midnight); }
+
+    .entry-actions button { border: none; background: none; color: #e54848; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 999px; background: rgba(13,27,42,0.08); color: var(--midnight); font-size: 12px; font-weight: 600; }
+    .client-error { display: none; background: rgba(255,71,87,0.08); color: #c53030; border: 1px solid rgba(255,71,87,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
+
+    .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px; }
+    .btn { appearance: none; border: 0; border-radius: 999px; padding: 12px 20px; font-weight: 600; cursor: pointer; font-size: 14px; transition: transform 0.15s, box-shadow 0.15s; }
+    .btn-primary { background: var(--accent); color: var(--bg-white); box-shadow: 0 16px 30px rgba(248,168,30,0.35); }
+    .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 18px 34px rgba(248,168,30,0.42); background: var(--accent-dark); }
+    .btn-secondary { background: var(--midnight); color: var(--bg-white); }
+    .btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(13,27,42,0.28); }
+
+    .error { background: rgba(255,71,87,0.08); color: #b32020; border: 1px solid rgba(255,71,87,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
+    small.hint { color: var(--text-muted); }
+
+    footer { text-align: center; margin: 36px 0; color: var(--text-muted); font-size: 13px; }
+
+    @media (max-width: 860px) {
+      .row { grid-template-columns: 1fr; }
+      header { padding: 40px 18px 20px; }
+      .hero-card { padding: 36px 28px; }
+      .hero-card h1 { font-size: 30px; }
+      .hero-actions { flex-direction: column; align-items: flex-start; }
+      .hero-actions .cta-secondary { border: none; padding: 0; }
+      main { padding: 0 18px 40px; }
+      .container { padding: 28px 24px; }
+      .actions { flex-direction: column-reverse; align-items: stretch; }
+      .btn { width: 100%; }
+      table.entries-table { font-size: 12px; overflow-x: auto; display: block; }
+    }
+  </style>
+  <script>
+    function $(id) { return document.getElementById(id); }
+
+    let entries = [];
+
+    function syncVisibility() {
+      const analyzePast = $("analyze_past").checked;
+      const pastBlock = $("past_block");
+      pastBlock.style.display = analyzePast ? "block" : "none";
+    }
+
+    function syncSliderValue(rangeId, labelId, unit) {
+      const v = document.getElementById(rangeId).value;
+      document.getElementById(labelId).innerText = v + " " + unit;
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      syncVisibility();
+      syncSliderValue("days_future", "days_future_value", "jours");
+      const pastRange = document.getElementById("days_past");
+      if (pastRange) syncSliderValue("days_past", "days_past_value", "jours");
+
+      const payloadField = $("entries_payload");
+      try {
+        entries = JSON.parse(payloadField.value || "[]");
+      } catch (err) {
+        entries = [];
+      }
+      updateEntriesView();
+
+      document.querySelector("form").addEventListener("submit", (event) => {
+        if (entries.length === 0) {
+          event.preventDefault();
+          showClientError("Ajoutez au moins un point de vente avant de sauvegarder.");
+        }
+      });
+    });
+
+    function showClientError(message) {
+      const box = $("client_error");
+      box.textContent = message;
+      box.style.display = "block";
+    }
+
+    function hideClientError() {
+      const box = $("client_error");
+      box.style.display = "none";
+    }
+
+    function addEntry() {
+      hideClientError();
+
+      const entry = {
+        store_name: $("store_name").value.trim(),
+        postal_code: $("postal_code").value.trim(),
+        contact_email: $("contact_email").value.trim(),
+        analyze_past: $("analyze_past").checked,
+        days_past: Number($("days_past").value || 0),
+        days_future: Number($("days_future").value || 0),
+        precipitation_type: document.querySelector('select[name="precipitation_type"]').value,
+        precipitation_value: document.querySelector('input[name="precipitation_value"]').value.trim(),
+        wind_type: document.querySelector('select[name="wind_type"]').value,
+        wind_value: document.querySelector('input[name="wind_value"]').value.trim(),
+        temperature_type: document.querySelector('select[name="temperature_type"]').value,
+        temperature_value: document.querySelector('input[name="temperature_value"]').value.trim(),
+        uv_min: document.querySelector('input[name="uv_min"]').value.trim(),
+      };
+
+      if (!entry.store_name) {
+        showClientError("Indiquez le nom du magasin.");
+        return;
+      }
+      if (!entry.postal_code) {
+        showClientError("Indiquez le code postal.");
+        return;
+      }
+      if (!entry.contact_email || !entry.contact_email.includes("@")) {
+        showClientError("Indiquez une adresse e-mail valide.");
+        return;
+      }
+      if (!entry.precipitation_value) {
+        showClientError("Indiquez une valeur de précipitations.");
+        return;
+      }
+      if (!entry.wind_value) {
+        showClientError("Indiquez une vitesse de vent.");
+        return;
+      }
+      if (!entry.temperature_value) {
+        showClientError("Indiquez une température.");
+        return;
+      }
+
+      entries.push(entry);
+      updateEntriesView();
+
+      // Conserver le nom du magasin pour saisir plusieurs codes postaux rapidement
+      $("postal_code").value = "";
+      $("contact_email").value = "";
+      document.querySelector('input[name="precipitation_value"]').value = "";
+      document.querySelector('input[name="wind_value"]').value = "";
+      document.querySelector('input[name="temperature_value"]').value = "";
+      document.querySelector('input[name="uv_min"]').value = "";
+    }
+
+    function removeEntry(index) {
+      entries.splice(index, 1);
+      updateEntriesView();
+    }
+
+    function editEntry(index) {
+      const entry = entries[index];
+      if (!entry) return;
+
+      $("store_name").value = entry.store_name || "";
+      $("postal_code").value = entry.postal_code || "";
+      $("contact_email").value = entry.contact_email || "";
+
+      $("analyze_past").checked = !!entry.analyze_past;
+      syncVisibility();
+
+      $("days_past").value = entry.days_past || 0;
+      $("days_future").value = entry.days_future || 0;
+      syncSliderValue("days_past","days_past_value","jours");
+      syncSliderValue("days_future","days_future_value","jours");
+
+      document.querySelector('select[name="precipitation_type"]').value = entry.precipitation_type || "minimum";
+      document.querySelector('input[name="precipitation_value"]').value = entry.precipitation_value || "";
+
+      document.querySelector('select[name="wind_type"]').value = entry.wind_type || "minimum";
+      document.querySelector('input[name="wind_value"]').value = entry.wind_value || "";
+
+      document.querySelector('select[name="temperature_type"]').value = entry.temperature_type || "minimum";
+      document.querySelector('input[name="temperature_value"]').value = entry.temperature_value || "";
+
+      document.querySelector('input[name="uv_min"]').value = entry.uv_min || "";
+
+      entries.splice(index, 1);
+      updateEntriesView();
+      hideClientError();
+    }
+
+    function resetEntries() {
+      entries = [];
+      updateEntriesView();
+      hideClientError();
+      document.querySelector("form").reset();
+      syncVisibility();
+      syncSliderValue('days_future','days_future_value','jours');
+    }
+
+    function updateEntriesView() {
+      $("entries_payload").value = JSON.stringify(entries);
+      const cards = $("entries_cards");
+      const empty = $("entries_empty");
+      cards.innerHTML = "";
+
+      if (entries.length === 0) {
+        empty.style.display = "block";
+        return;
+      }
+
+      empty.style.display = "none";
+
+      const formatOrDash = (value, suffix = "") => {
+        if (!value && value !== 0) return "—";
+        const formatted = String(value).trim();
+        return suffix ? `${formatted}${suffix}` : formatted;
+      };
+
+      entries.forEach((entry, index) => {
+        const card = document.createElement("div");
+        card.className = "entry-card";
+
+        const daysBefore = entry.analyze_past ? entry.days_past : 0;
+        const daysAfter = entry.days_future || 0;
+
+        const tempLabel = entry.temperature_type === "minimum" ? "Température ≥" : "Température ≤";
+        const tempValue = formatOrDash(entry.temperature_value, "°C");
+
+        const precipLabel = entry.precipitation_type === "minimum" ? "Précipitations ≥" : "Précipitations ≤";
+        const precipValue = formatOrDash(entry.precipitation_value, " mm");
+
+        const windLabel = entry.wind_type === "minimum" ? "Vent ≥" : "Vent ≤";
+        const windValue = formatOrDash(entry.wind_value, " km/h");
+
+        const uvValue = entry.uv_min ? formatOrDash(entry.uv_min) : "—";
+
+        card.innerHTML = `
+          <div class="entry-actions-card">
+            <button type="button" class="entry-button edit" onclick="editEntry(${index})">Modifier</button>
+            <button type="button" class="entry-button delete" onclick="removeEntry(${index})">Supprimer</button>
+          </div>
+          <div class="entry-header">
+            <h3 class="entry-title">${entry.store_name || "Magasin"}</h3>
+            <div class="entry-sub">Code postal : ${entry.postal_code || "—"}</div>
+            <div class="entry-sub">Email : ${entry.contact_email || "—"}</div>
+          </div>
+          <div class="entry-badges">
+            <span class="entry-badge">Fenêtre J-${daysBefore} à J+${daysAfter}</span>
+            <span class="entry-badge">${tempLabel} ${tempValue}</span>
+            <span class="entry-badge">${precipLabel} ${precipValue}</span>
+            <span class="entry-badge">${windLabel} ${windValue}</span>
+          </div>
+          <div class="entry-metrics">
+            <div>
+              <strong>Jours avant</strong>
+              ${daysBefore}
+            </div>
+            <div>
+              <strong>Jours après</strong>
+              ${daysAfter}
+            </div>
+            <div>
+              <strong>UV min</strong>
+              ${uvValue}
+            </div>
+            <div>
+              <strong>Analyse passée</strong>
+              ${entry.analyze_past ? "Oui" : "Non"}
+            </div>
+          </div>
+        `;
+
+        cards.appendChild(card);
+      });
+    }
+  </script>
+  <link rel="icon" href="data:," />
+}</head>
+<body>
+  <header>
+    <div class="hero-card">
+      <span class="badge-pill">Campagnes météo</span>
+      <h1>Orchestrez vos campagnes locales dès que la météo change</h1>
+      <p>Connectez vos magasins à vos audiences en un clic. Configurez les seuils météo, synchronisez vos scénarios d’activation et pilotez vos actions marketing en temps réel, comme vous le faites déjà sur Wellpack.</p>
+      <div class="hero-actions">
+        <a class="cta-primary" href="#form">Configurer un point de vente</a>
+        <a class="cta-secondary" href="https://www.wellpack.fr" target="_blank" rel="noopener">
+          <span>→</span> Voir les solutions Wellpack
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="container" id="form">
+      <h2 class="section-title">Configuration météo</h2>
+      <p class="sub">Saisissez les points de vente, définissez les seuils météo et téléchargez le fichier cible en un clic.</p>
+
+    {% if error_message %}
+      <div class="error">{{ error_message }}</div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('submit') }}" novalidate>
+      <input type="hidden" id="entries_payload" name="entries_payload" value="{{ form_data.entries_payload if form_data and form_data.entries_payload else '[]' }}" />
+      <div id="client_error" class="client-error"></div>
+      <div class="row">
+        <div class="field">
+          <label for="store_name">Nom du magasin</label>
+          <input id="store_name" name="store_name" type="text" placeholder="Ex: Decathlon" value="{{ (form_data.store_name if form_data else '') }}" required />
+        </div>
+        <div class="field">
+          <label for="contact_email">Adresse e-mail à contacter</label>
+          <input id="contact_email" name="contact_email" type="email" placeholder="contact@exemple.com" value="{{ (form_data.contact_email if form_data else '') }}" required />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="postal_code">Code postal du point de vente</label>
+        <input id="postal_code" name="postal_code" type="text" placeholder="Ex: 75011" value="{{ (form_data.postal_code if form_data else '') }}" required />
+        <small class="hint">Chaque soumission correspond à un point de vente spécifique. Soumettez de nouveau pour un autre code postal.</small>
+      </div>
+
+      <div class="checkbox">
+        <input id="analyze_past" name="analyze_past" type="checkbox" onchange="syncVisibility()" {% if form_data and form_data.analyze_past %}checked{% endif %} />
+        <label for="analyze_past" style="margin:0;">Inclure des jours passés à analyser</label>
+      </div>
+
+      <div class="slider-group">
+        <div id="past_block" style="display:none;">
+          <label for="days_past">Jours passés à inclure</label>
+          <div class="slider">
+            <input id="days_past" name="days_past" type="range" min="0" max="5" step="1" value="{{ (form_data.days_past if form_data else 0) }}" oninput="syncSliderValue('days_past','days_past_value','jours')" />
+            <span id="days_past_value">0 jours</span>
+          </div>
+          <small class="hint">0 à 5 jours en arrière.</small>
+        </div>
+
+        <label for="days_future" style="margin-top:10px;">Jours futurs à analyser</label>
+        <div class="slider">
+          <input id="days_future" name="days_future" type="range" min="0" max="5" step="1" value="{{ (form_data.days_future if form_data else 3) }}" oninput="syncSliderValue('days_future','days_future_value','jours')" />
+          <span id="days_future_value">3 jours</span>
+        </div>
+        <small class="hint">0 à 5 jours à venir.</small>
+      </div>
+
+      <div class="field" style="margin-top:24px;">
+        <label>Seuils météo</label>
+        <div class="threshold-grid">
+          <div class="threshold-card">
+            <h3>Précipitations</h3>
+            <div class="threshold-inputs">
+              <select name="precipitation_type">
+                {% set precip_type = (form_data.precipitation_type if form_data else 'minimum') %}
+                <option value="minimum" {% if precip_type == 'minimum' %}selected{% endif %}>Minimum</option>
+                <option value="maximum" {% if precip_type == 'maximum' %}selected{% endif %}>Maximum</option>
+              </select>
+              <input type="number" step="0.1" min="0" name="precipitation_value" placeholder="mm" value="{{ (form_data.precipitation_value if form_data else '') }}" required />
+            </div>
+            <small class="hint">Valeur en millimètres (mm).</small>
+          </div>
+
+          <div class="threshold-card">
+            <h3>Vent</h3>
+            <div class="threshold-inputs">
+              <select name="wind_type">
+                {% set wind_type = (form_data.wind_type if form_data else 'minimum') %}
+                <option value="minimum" {% if wind_type == 'minimum' %}selected{% endif %}>Minimum</option>
+                <option value="maximum" {% if wind_type == 'maximum' %}selected{% endif %}>Maximum</option>
+              </select>
+              <input type="number" step="0.1" min="0" name="wind_value" placeholder="km/h" value="{{ (form_data.wind_value if form_data else '') }}" required />
+            </div>
+            <small class="hint">Vitesse en km/h.</small>
+          </div>
+
+          <div class="threshold-card">
+            <h3>Température</h3>
+            <div class="threshold-inputs">
+              <select name="temperature_type">
+                {% set temperature_type = (form_data.temperature_type if form_data else 'minimum') %}
+                <option value="minimum" {% if temperature_type == 'minimum' %}selected{% endif %}>Minimum</option>
+                <option value="maximum" {% if temperature_type == 'maximum' %}selected{% endif %}>Maximum</option>
+              </select>
+              <input type="number" step="0.1" name="temperature_value" placeholder="°C" value="{{ (form_data.temperature_value if form_data else '') }}" required />
+            </div>
+            <small class="hint">Température en degrés Celsius.</small>
+          </div>
+
+          <div class="threshold-card">
+            <h3>Indice UV</h3>
+            <div class="threshold-inputs">
+              <select disabled style="opacity:0.5; cursor:not-allowed;">
+                <option>Minimum</option>
+              </select>
+              <input type="number" step="0.1" min="0" name="uv_min" placeholder="Indice" value="{{ (form_data.uv_min if form_data else '') }}" />
+            </div>
+            <small class="hint">Optionnel. Laissez vide si non concerné.</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="button" class="btn btn-secondary" onclick="resetEntries()">Tout effacer</button>
+        <button type="button" class="btn btn-secondary" onclick="addEntry()">+ Ajouter ce point de vente</button>
+        <button type="submit" class="btn btn-primary">Lancer l’analyse météo</button>
+      </div>
+
+      <div class="entries-section">
+        <h2 style="margin:0;">Points de vente ajoutés</h2>
+        <p class="hint" style="margin:4px 0 0; color:#6b7280;">Ajoutez autant de points de vente que nécessaire puis cliquez sur « Lancer l’analyse météo » pour vérifier les conditions et notifier automatiquement les magasins.</p>
+        <div id="entries_empty" style="margin-top:12px; color:#6b7280; font-size:14px;">Aucun point de vente pour l'instant.</div>
+        <div class="entries-cards" id="entries_cards"></div>
+      </div>
+    </form>
+  </div>
+  </main>
+  <footer>
+    © 2025 Trigger Météo · Plateforme pilotée par les données
+  </footer>
+</body>
+</html>
+
+
