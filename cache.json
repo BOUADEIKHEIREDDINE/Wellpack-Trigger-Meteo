@@ -1,0 +1,4 @@
+{
+  "last_input": "[{\"store_name\":\"test\",\"postal_code\":\"94420\",\"contact_email\":\"khairkhair012@gmail.com\",\"analyze_past\":true,\"days_past\":2,\"days_future\":2,\"precipitation_type\":\"maximum\",\"precipitation_value\":\"30\",\"wind_type\":\"maximum\",\"wind_value\":\"50\",\"temperature_type\":\"maximum\",\"temperature_value\":\"30\",\"uv_min\":\"\"}]",
+  "repeat_hours": 0.02
+}
