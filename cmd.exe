@@ -1,0 +1,7 @@
+@echo off
+cd /d C:\chemin\vers\weather_engine
+set SMTP_EMAIL=votre_email@example.com
+set SMTP_PASSWORD=motdepasse
+rem If you use a virtualenv, uncomment the next line and set the right path
+rem call C:\chemin\vers\venv\Scripts\activate
+python scheduled_backend_runner.py
