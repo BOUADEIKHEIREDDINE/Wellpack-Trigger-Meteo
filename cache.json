@@ -1,4 +1,4 @@
 {
   "last_input": "[{\"store_name\":\"Decathlon\",\"postal_code\":\"94230\",\"contact_email\":\"khairkhair012@gmail.com\",\"analyze_past\":true,\"days_past\":2,\"days_future\":2,\"precipitation_type\":\"minimum\",\"precipitation_value\":\"0\",\"wind_type\":\"minimum\",\"wind_value\":\"0\",\"temperature_type\":\"minimum\",\"temperature_value\":\"0\",\"uv_min\":\"\"}]",
-  "last_run": "2025-11-14T09:40:22"
+  "last_run": "2025-11-14T10:35:10"
 }

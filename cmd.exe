@@ -1,3 +1,0 @@
-@echo off
-cd /d C:\chemin\vers\weather_engine
-python scheduled_backend_runner.py
