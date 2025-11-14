@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 import os
 import threading
 import time
@@ -10,13 +10,38 @@ from typing import Dict, List, Tuple, Optional
 
 import pandas as pd
 from apscheduler.schedulers.background import BackgroundScheduler
-from flask import jsonify
 
 from moduleMeteo import decision_maker_daily
 from mailSendingModule import envoyer_email
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def load_env_file(path: str) -> None:
+    """
+    Charge un fichier .env (clé=valeur) pour garantir la présence des
+    identifiants SMTP lorsque l'application est lancée manuellement ou
+    par un planificateur externe.
+    """
+    if not os.path.isfile(path):
+        return
+    try:
+        with open(path, "r", encoding="utf-8") as env_file:
+            for raw_line in env_file:
+                line = raw_line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                key, value = line.split("=", 1)
+                key = key.strip()
+                value = value.strip().strip('"').strip("'")
+                if key and value and key not in os.environ:
+                    os.environ[key] = value
+    except Exception:
+        pass
+
+
+load_env_file(os.path.join(BASE_DIR, ".env"))
 
 
 # Les templates sont situés dans le même dossier que ce script
@@ -248,6 +273,13 @@ def build_email_body(store_label: str, store_meta: dict, store_daily: pd.DataFra
 def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.DataFrame) -> Tuple[Dict[str, dict], dict]:
     smtp_email = os.environ.get("SMTP_EMAIL")
     smtp_password = os.environ.get("SMTP_PASSWORD")
+    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port_raw = os.environ.get("SMTP_PORT", "587")
+    try:
+        smtp_port = int(smtp_port_raw)
+    except (TypeError, ValueError):
+        smtp_port = 587
+
     smtp_configured = bool(smtp_email and smtp_password)
 
     reports: Dict[str, dict] = {}
@@ -288,6 +320,8 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
             destinataire_email=recipient,
             sujet=subject,
             corps_message=body,
+            serveur_smtp=smtp_server,
+            port_smtp=smtp_port,
         )
 
         reports[store_label] = {
@@ -298,6 +332,8 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
     smtp_context = {
         "configured": smtp_configured,
         "sender": smtp_email,
+        "server": smtp_server,
+        "port": smtp_port,
     }
 
     return reports, smtp_context
@@ -350,30 +386,35 @@ def execute_analysis(entries_raw: str) -> Tuple[dict, List[dict], List[str], dic
         entries = []
 
     module_rows, stores_meta, issues = transform_entries(entries)
+
     if not module_rows:
-        # nothing to run
-        return {
+        summary = {
             "total": 0,
             "alerts": 0,
             "emails_sent": 0,
             "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M"),
             "smtp_configured": False,
             "sender": None,
-        }, [], issues or ["Aucune entrée valide à analyser."], {"configured": False, "sender": None}
+        }
+        smtp_context = {"configured": False, "sender": None}
+        return summary, [], issues or ["Aucune entrée valide à analyser."], smtp_context
 
     df_input = pd.DataFrame(module_rows)
 
     try:
         decisions, df_daily = decision_maker_daily(df_input)
     except Exception as exc:
-        return {
+        summary = {
             "total": 0,
             "alerts": 0,
             "emails_sent": 0,
             "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M"),
             "smtp_configured": False,
             "sender": None,
-        }, [], [f"Erreur lors de l'analyse météo : {exc}"], {"configured": False, "sender": None}
+        }
+        message = f"Erreur lors de l'analyse météo : {exc}"
+        smtp_context = {"configured": False, "sender": None}
+        return summary, [], issues + [message], smtp_context
 
     df_daily = df_daily if isinstance(df_daily, pd.DataFrame) else pd.DataFrame()
     email_reports, smtp_context = send_alerts(decisions, stores_meta, df_daily)
@@ -392,26 +433,11 @@ def execute_analysis(entries_raw: str) -> Tuple[dict, List[dict], List[str], dic
         "sender": smtp_context.get("sender"),
     }
 
-    return summary, stores_results, [], smtp_context
-
-
-# La tâche de planification interne n'est plus utilisée
-# def job():
-#     if os.path.exists(CACHE_PATH):
-#         try:
-#             with open(CACHE_PATH, "r", encoding="utf-8") as f:
-#                 cache = json.load(f)
-#         except json.JSONDecodeError:
-#             return
-#         entries_raw = cache.get("last_input", "[]")
-#         # Exécute silencieusement l'analyse et l'envoi de mails à intervalle régulier
-#         execute_analysis(entries_raw)
+    return summary, stores_results, issues, smtp_context
 
 
 def should_run_now(cache: dict) -> bool:
-    # Cette fonction n'est plus pertinente pour le déclenchement interne, mais est conservée
-    # pour la compatibilité avec cli_job.py si utilisé indépendamment.
-    return True  # Toujours autoriser le run si appelé
+    return True
 
 
 def mark_run(cache: dict) -> None:
@@ -424,16 +450,15 @@ def mark_run(cache: dict) -> None:
         pass
 
 
-@app.route("/", methods=["GET"])
+@app.route("/", methods=["GET"]) 
 def index():
     return render_template("index.html")
 
 
-@app.route("/submit", methods=["POST"])
+@app.route("/submit", methods=["POST"]) 
 def submit():
     entries_payload = request.form.get("entries_payload", "[]")
 
-    # Sauvegarde du cache (entrée uniquement, l'intervalle n'est plus géré ici)
     try:
         with open(CACHE_PATH, "w", encoding="utf-8") as f:
             json.dump({"last_input": entries_payload}, f, ensure_ascii=False, indent=2)
@@ -442,7 +467,6 @@ def submit():
 
     summary, stores_results, issues, smtp_context = execute_analysis(entries_payload)
 
-    # Marquer le dernier run réussi pour support des planifications externes
     try:
         if os.path.exists(CACHE_PATH):
             with open(CACHE_PATH, "r", encoding="utf-8") as f:
@@ -461,18 +485,6 @@ def submit():
             form_data={"entries_payload": entries_payload},
         )
 
-    # Le scheduler APScheduler n'est plus utilisé pour la relance automatique
-    try:
-        scheduler.remove_all_jobs()
-    except Exception:
-        pass
-    # Note: On laisse un job minimal pour que le scheduler tourne s'il est utilisé
-    # dans un autre contexte, mais il ne déclenchera plus la logique métier.
-    try:
-        scheduler.add_job(lambda: None, "interval", hours=24, id="wellpack_recurring_job_placeholder", replace_existing=True)
-    except Exception:
-        pass
-
     return render_template(
         "results.html",
         summary=summary,
@@ -484,8 +496,6 @@ def submit():
 
 @app.route("/cron", methods=["POST", "GET"])
 def cron():
-    # Cet endpoint n'est plus utilisé pour le déclenchement interne par le scheduler Flask.
-    # Il pourrait être utilisé par un service externe si nécessaire.
     return jsonify({"ok": False, "reason": "deprecated_endpoint"}), 404
 
 
@@ -497,7 +507,6 @@ if __name__ == "__main__":
 
     threading.Thread(target=open_browser, daemon=True).start()
 
-    # Le scheduler APScheduler est démarré, mais n'a plus de tâches métier récurrentes.
     try:
         scheduler.start()
     except Exception:
