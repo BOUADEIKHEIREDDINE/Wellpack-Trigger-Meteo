@@ -1,9 +1,50 @@
 import json
 import os
 from datetime import datetime
+from typing import List, Tuple
+
+import pandas as pd
 
 # Import the necessary functions from frontend.py and moduleMeteo.py
-from frontend import CACHE_PATH, execute_analysis, mark_run
+from frontend import CACHE_PATH, execute_analysis, mark_run, transform_entries
+from moduleMeteo import decision_maker_daily
+
+
+def evaluate_conditions(entries_raw: str) -> Tuple[bool, List[str]]:
+    """
+    Retourne (conditions_ok, issues) sans déclencher d'envoi d'e-mails.
+    conditions_ok est True si au moins un magasin déclencherait une alerte.
+    """
+    try:
+        entries = json.loads(entries_raw or "[]")
+    except json.JSONDecodeError as exc:
+        return False, [f"Entrées invalides (JSON): {exc}"]
+
+    module_rows, _, issues = transform_entries(entries)
+    if not module_rows:
+        return False, issues or ["Aucune entrée exploitable pour l'analyse."]
+
+    df_input = pd.DataFrame(module_rows)
+    try:
+        decisions, _ = decision_maker_daily(df_input)
+    except Exception as exc:
+        issues = issues or []
+        issues.append(f"Erreur lors de l'évaluation des conditions: {exc}")
+        return False, issues
+
+    return bool(decisions), issues
+
+
+def should_send_mail(previous_state: bool, conditions_ok: bool, first_run: bool) -> bool:
+    if first_run:
+        # Considérer state=False par défaut puis appliquer les règles classiques.
+        return conditions_ok
+
+    if conditions_ok and not previous_state:
+        return True  # conditions rétablies
+    if not conditions_ok and previous_state:
+        return True  # conditions ne sont plus respectées
+    return False
 
 
 def main():
@@ -27,17 +68,33 @@ def main():
         print("No entries found in cache for analysis.")
         return
 
-    print(f"Starting weather analysis at {datetime.now().isoformat(timespec='seconds')}")
-    summary, _, issues, _ = execute_analysis(entries_raw)
-    mark_run(cache)  # Mark the run to update 'last_run' timestamp in cache.json
+    previous_state = bool(cache.get("state")) if "state" in cache else False
+    first_run = "state" not in cache
 
-    if issues:
-        print("Issues during analysis:")
-        for issue in issues:
+    conditions_ok, eval_issues = evaluate_conditions(entries_raw)
+    if eval_issues:
+        print("Evaluation issues:")
+        for issue in eval_issues:
             print(f"- {issue}")
 
-    print(f"Analysis summary: {json.dumps(summary, ensure_ascii=False, indent=2)}")
-    print(f"Weather analysis completed at {datetime.now().isoformat(timespec='seconds')}")
+    send_mail = should_send_mail(previous_state, conditions_ok, first_run)
+
+    if send_mail:
+        print(f"Starting weather analysis at {datetime.now().isoformat(timespec='seconds')}")
+        summary, _, issues, _ = execute_analysis(entries_raw)
+
+        if issues:
+            print("Issues during analysis:")
+            for issue in issues:
+                print(f"- {issue}")
+
+        print(f"Analysis summary: {json.dumps(summary, ensure_ascii=False, indent=2)}")
+        print(f"Weather analysis completed at {datetime.now().isoformat(timespec='seconds')}")
+    else:
+        print("No state change detected. Skipping email dispatch.")
+
+    cache["state"] = conditions_ok
+    mark_run(cache)  # Mark the run to update 'last_run' timestamp (and state) in cache.json
 
 
 if __name__ == "__main__":

@@ -522,21 +522,21 @@ def index():
 @app.route("/submit", methods=["POST"]) 
 def submit():
     entries_payload = request.form.get("entries_payload", "[]")
-
-    try:
-        with open(CACHE_PATH, "w", encoding="utf-8") as f:
-            json.dump({"last_input": entries_payload}, f, ensure_ascii=False, indent=2)
-    except Exception:
-        pass
-
     summary, stores_results, issues, smtp_context = execute_analysis(entries_payload)
 
     try:
         if os.path.exists(CACHE_PATH):
             with open(CACHE_PATH, "r", encoding="utf-8") as f:
-                cache = json.load(f)
+                cache = json.load(f) or {}
         else:
-            cache = {"last_input": entries_payload}
+            cache = {}
+    except Exception:
+        cache = {}
+
+    cache["last_input"] = entries_payload
+    cache["state"] = bool(summary.get("emails_sent", 0))
+
+    try:
         mark_run(cache)
     except Exception:
         pass

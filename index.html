@@ -190,9 +190,132 @@
     .checkbox { display: flex; align-items: center; gap: 10px; margin: 16px 0 20px; padding: 12px 16px; background: rgba(248,168,30,0.08); border-radius: 14px; border: 1px solid rgba(248,168,30,0.18); }
     .checkbox label { margin: 0; color: var(--midnight); font-weight: 500; }
 
-    .slider-group { background: linear-gradient(135deg, rgba(13,27,42,0.06), rgba(255,255,255,0.65)); border: 1px solid rgba(13,27,42,0.1); border-radius: 18px; padding: 24px 24px; box-shadow: inset 0 1px 0 rgba(255,255,255,0.6); }
-    .slider { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: center; margin: 10px 0; }
-    input[type="range"] { width: 100%; }
+    .slider-group {
+      background: linear-gradient(135deg, rgba(13,27,42,0.04), rgba(255,255,255,0.85));
+      border: 1px solid rgba(13,27,42,0.08);
+      border-radius: 22px;
+      padding: 28px 32px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7), 0 26px 60px rgba(13,27,42,0.12);
+    }
+    .timeline-slider { display: flex; flex-direction: column; gap: 20px; }
+    .timeline-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .timeline-labels span:nth-child(2) { color: var(--midnight); font-weight: 700; }
+    .timeline-track {
+      position: relative;
+      padding: 28px 24px 60px;
+      --before-fill: 0%;
+      --after-fill: 0%;
+    }
+    .timeline-base {
+      display: flex;
+      align-items: center;
+      background: rgba(255,255,255,0.9);
+      border-radius: 999px;
+      height: 16px;
+      box-shadow: inset 0 1px 2px rgba(13,27,42,0.12), 0 9px 20px rgba(13,27,42,0.08);
+      overflow: hidden;
+    }
+    .timeline-half {
+      flex: 1;
+      position: relative;
+      height: 100%;
+      background: rgba(13,27,42,0.05);
+    }
+    .timeline-half:first-child { border-top-left-radius: 999px; border-bottom-left-radius: 999px; }
+    .timeline-half:last-child { border-top-right-radius: 999px; border-bottom-right-radius: 999px; }
+    .timeline-fill {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      pointer-events: none;
+    }
+    .timeline-fill-before {
+      right: 0;
+      width: var(--before-fill);
+      background: linear-gradient(90deg, rgba(123,189,239,0.15), rgba(7,165,211,0.55));
+      border-top-left-radius: 999px;
+      border-bottom-left-radius: 999px;
+    }
+    .timeline-fill-after {
+      left: 0;
+      width: var(--after-fill);
+      background: linear-gradient(90deg, rgba(248,168,30,0.25), rgba(244,174,28,0.65));
+      border-top-right-radius: 999px;
+      border-bottom-right-radius: 999px;
+    }
+    .timeline-range {
+      position: absolute;
+      top: 15px;
+      appearance: none;
+      background: transparent;
+      border: none;
+      outline: none;
+      height: 20px;
+      pointer-events: auto;
+      z-index: 3;
+    }
+    .timeline-range:focus,
+    .timeline-range:focus-visible {
+      outline: none;
+      box-shadow: none;
+    }
+    .timeline-range::-moz-focus-outer { border: 0; }
+    .timeline-range::-webkit-slider-runnable-track { background: transparent; border: none; height: 0; }
+    .timeline-range::-webkit-slider-thumb {
+      appearance: none;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 3px solid #fff;
+      box-shadow: 0 8px 18px rgba(248,168,30,0.4);
+      cursor: pointer;
+    }
+    .timeline-range::-moz-range-track { background: transparent; border: none; height: 0; }
+    .timeline-range::-moz-range-thumb {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: 3px solid #fff;
+      box-shadow: 0 8px 18px rgba(248,168,30,0.4);
+      cursor: pointer;
+    }
+    .timeline-range-before {
+      left: 18px;
+      width: calc(50% - 24px);
+      direction: rtl;
+    }
+    .timeline-range-after {
+      right: 18px;
+      width: calc(50% - 24px);
+    }
+    .timeline-values {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+    }
+    .value-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-weight: 600;
+      font-size: 13px;
+      background: rgba(12,189,217,0.14);
+      color: var(--midnight);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.7);
+    }
     .threshold-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
     .threshold-card {
       border: 1px solid rgba(13,27,42,0.08);
@@ -255,12 +378,6 @@
 
     let entries = [];
 
-    function syncVisibility() {
-      const analyzePast = $("analyze_past").checked;
-      const pastBlock = $("past_block");
-      pastBlock.style.display = analyzePast ? "block" : "none";
-    }
-
     function syncRainVisibility() {
       const wantsRain = $("wants_rain").checked;
       const rainLevelsBlock = $("rain_levels_block");
@@ -272,16 +389,37 @@
     }
 
     function syncSliderValue(rangeId, labelId, unit) {
-      const v = document.getElementById(rangeId).value;
-      document.getElementById(labelId).innerText = v + " " + unit;
+      const input = document.getElementById(rangeId);
+      const label = document.getElementById(labelId);
+      if (!input || !label) {
+        updateTimeline();
+        return;
+      }
+      const value = Number(input.value || 0);
+      const suffix = value > 1 ? unit + "s" : unit;
+      label.innerText = `${value} ${suffix}`;
+      updateTimeline();
+    }
+
+    function updateTimeline() {
+      const track = document.querySelector(".timeline-track");
+      if (!track) return;
+      const maxBefore = Number(track.dataset.maxBefore || 5);
+      const maxAfter = Number(track.dataset.maxAfter || 5);
+      const beforeInput = $("days_past");
+      const afterInput = $("days_future");
+      const beforeValue = beforeInput ? Number(beforeInput.value || 0) : 0;
+      const afterValue = afterInput ? Number(afterInput.value || 0) : 0;
+      const beforePercent = Math.min(100, Math.max(0, (beforeValue / maxBefore) * 100));
+      const afterPercent = Math.min(100, Math.max(0, (afterValue / maxAfter) * 100));
+      track.style.setProperty("--before-fill", `${beforePercent}%`);
+      track.style.setProperty("--after-fill", `${afterPercent}%`);
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      syncVisibility();
       syncRainVisibility();
-      syncSliderValue("days_future", "days_future_value", "jours");
-      const pastRange = document.getElementById("days_past");
-      if (pastRange) syncSliderValue("days_past", "days_past_value", "jours");
+      syncSliderValue("days_future", "days_future_value", "jour");
+      syncSliderValue("days_past", "days_past_value", "jour");
 
       const payloadField = $("entries_payload");
       try {
@@ -316,13 +454,16 @@
       const wantsRain = $("wants_rain").checked;
       const rainLevels = Array.from(document.querySelectorAll('input[name="rain_levels"]:checked')).map(cb => cb.value);
 
+      const daysPast = Number($("days_past").value || 0);
+      const daysFuture = Number($("days_future").value || 0);
+
       const entry = {
         store_name: $("store_name").value.trim(),
         postal_code: $("postal_code").value.trim(),
         contact_email: $("contact_email").value.trim(),
-        analyze_past: $("analyze_past").checked,
-        days_past: Number($("days_past").value || 0),
-        days_future: Number($("days_future").value || 0),
+        analyze_past: daysPast > 0,
+        days_past: daysPast,
+        days_future: daysFuture,
         wants_rain: wantsRain,
         rain_levels: rainLevels,
         wind_type: document.querySelector('select[name="wind_type"]').value,
@@ -382,13 +523,10 @@
       $("postal_code").value = entry.postal_code || "";
       $("contact_email").value = entry.contact_email || "";
 
-      $("analyze_past").checked = !!entry.analyze_past;
-      syncVisibility();
-
       $("days_past").value = entry.days_past || 0;
       $("days_future").value = entry.days_future || 0;
-      syncSliderValue("days_past","days_past_value","jours");
-      syncSliderValue("days_future","days_future_value","jours");
+      syncSliderValue("days_past","days_past_value","jour");
+      syncSliderValue("days_future","days_future_value","jour");
 
       // Gérer les précipitations avec la nouvelle structure
       if (entry.wants_rain !== undefined) {
@@ -423,8 +561,10 @@
       updateEntriesView();
       hideClientError();
       document.querySelector("form").reset();
-      syncVisibility();
-      syncSliderValue('days_future','days_future_value','jours');
+      $("days_past").value = 0;
+      $("days_future").value = 3;
+      syncSliderValue('days_past','days_past_value','jour');
+      syncSliderValue('days_future','days_future_value','jour');
     }
 
     function updateEntriesView() {
@@ -450,7 +590,7 @@
         const card = document.createElement("div");
         card.className = "entry-card";
 
-        const daysBefore = entry.analyze_past ? entry.days_past : 0;
+        const daysBefore = entry.days_past || 0;
         const daysAfter = entry.days_future || 0;
 
         const tempLabel = entry.temperature_type === "minimum" ? "Température ≥" : "Température ≤";
@@ -564,27 +704,35 @@
         <small class="hint">Chaque soumission correspond à un point de vente spécifique. Soumettez de nouveau pour un autre code postal.</small>
       </div>
 
-      <div class="checkbox">
-        <input id="analyze_past" name="analyze_past" type="checkbox" onchange="syncVisibility()" {% if form_data and form_data.analyze_past %}checked{% endif %} />
-        <label for="analyze_past" style="margin:0;">Inclure des jours passés à analyser</label>
-      </div>
-
-      <div class="slider-group">
-        <div id="past_block" style="display:none;">
-          <label for="days_past">Jours passés à inclure</label>
-          <div class="slider">
-            <input id="days_past" name="days_past" type="range" min="0" max="5" step="1" value="{{ (form_data.days_past if form_data else 0) }}" oninput="syncSliderValue('days_past','days_past_value','jours')" />
-            <span id="days_past_value">0 jours</span>
+      <div class="slider-group timeline-slider">
+        <div class="timeline-labels">
+          <span>Jours avant</span>
+          <span>Aujourd'hui</span>
+          <span>Jours après</span>
+        </div>
+        <div class="timeline-track" data-max-before="5" data-max-after="5">
+          <input id="days_past" name="days_past" type="range" min="0" max="5" step="1" value="{{ (form_data.days_past if form_data else 0) }}" class="timeline-range timeline-range-before" oninput="syncSliderValue('days_past','days_past_value','jour')" />
+          <input id="days_future" name="days_future" type="range" min="0" max="5" step="1" value="{{ (form_data.days_future if form_data else 3) }}" class="timeline-range timeline-range-after" oninput="syncSliderValue('days_future','days_future_value','jour')" />
+          <div class="timeline-base">
+            <div class="timeline-half timeline-before">
+              <div class="timeline-fill timeline-fill-before"></div>
+            </div>
+            <div class="timeline-half timeline-after">
+              <div class="timeline-fill timeline-fill-after"></div>
+            </div>
           </div>
-          <small class="hint">0 à 5 jours en arrière.</small>
         </div>
-
-        <label for="days_future" style="margin-top:10px;">Jours futurs à analyser</label>
-        <div class="slider">
-          <input id="days_future" name="days_future" type="range" min="0" max="5" step="1" value="{{ (form_data.days_future if form_data else 3) }}" oninput="syncSliderValue('days_future','days_future_value','jours')" />
-          <span id="days_future_value">3 jours</span>
+        <div class="timeline-values">
+          <div>
+            <small style="display:block; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); font-size:11px;">Jours avant</small>
+            <span class="value-pill" id="days_past_value">0 jour</span>
+          </div>
+          <div>
+            <small style="display:block; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-muted); font-size:11px; text-align:right;">Jours après</small>
+            <span class="value-pill" id="days_future_value">3 jours</span>
+          </div>
         </div>
-        <small class="hint">0 à 5 jours à venir.</small>
+        <small class="hint" style="display:block; text-align:center; margin-top:8px;">Faites glisser chaque extrémité pour ajuster la fenêtre d'analyse (0 à 5 jours).</small>
       </div>
 
       <div class="field" style="margin-top:24px;">
