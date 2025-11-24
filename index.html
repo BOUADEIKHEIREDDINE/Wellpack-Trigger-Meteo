@@ -261,6 +261,16 @@
       pastBlock.style.display = analyzePast ? "block" : "none";
     }
 
+    function syncRainVisibility() {
+      const wantsRain = $("wants_rain").checked;
+      const rainLevelsBlock = $("rain_levels_block");
+      rainLevelsBlock.style.display = wantsRain ? "block" : "none";
+      if (!wantsRain) {
+        // Décocher toutes les cases de seuils si on ne veut pas de pluie
+        document.querySelectorAll('input[name="rain_levels"]').forEach(cb => cb.checked = false);
+      }
+    }
+
     function syncSliderValue(rangeId, labelId, unit) {
       const v = document.getElementById(rangeId).value;
       document.getElementById(labelId).innerText = v + " " + unit;
@@ -268,6 +278,7 @@
 
     document.addEventListener("DOMContentLoaded", () => {
       syncVisibility();
+      syncRainVisibility();
       syncSliderValue("days_future", "days_future_value", "jours");
       const pastRange = document.getElementById("days_past");
       if (pastRange) syncSliderValue("days_past", "days_past_value", "jours");
@@ -302,6 +313,9 @@
     function addEntry() {
       hideClientError();
 
+      const wantsRain = $("wants_rain").checked;
+      const rainLevels = Array.from(document.querySelectorAll('input[name="rain_levels"]:checked')).map(cb => cb.value);
+
       const entry = {
         store_name: $("store_name").value.trim(),
         postal_code: $("postal_code").value.trim(),
@@ -309,8 +323,8 @@
         analyze_past: $("analyze_past").checked,
         days_past: Number($("days_past").value || 0),
         days_future: Number($("days_future").value || 0),
-        precipitation_type: document.querySelector('select[name="precipitation_type"]').value,
-        precipitation_value: document.querySelector('input[name="precipitation_value"]').value.trim(),
+        wants_rain: wantsRain,
+        rain_levels: rainLevels,
         wind_type: document.querySelector('select[name="wind_type"]').value,
         wind_value: document.querySelector('input[name="wind_value"]').value.trim(),
         temperature_type: document.querySelector('select[name="temperature_type"]').value,
@@ -330,8 +344,8 @@
         showClientError("Indiquez une adresse e-mail valide.");
         return;
       }
-      if (!entry.precipitation_value) {
-        showClientError("Indiquez une valeur de précipitations.");
+      if (entry.wants_rain && entry.rain_levels.length === 0) {
+        showClientError("Si vous voulez de la pluie, sélectionnez au moins un seuil.");
         return;
       }
       if (!entry.wind_value) {
@@ -349,10 +363,10 @@
       // Conserver le nom du magasin pour saisir plusieurs codes postaux rapidement
       $("postal_code").value = "";
       $("contact_email").value = "";
-      document.querySelector('input[name="precipitation_value"]').value = "";
       document.querySelector('input[name="wind_value"]').value = "";
       document.querySelector('input[name="temperature_value"]').value = "";
       document.querySelector('input[name="uv_min"]').value = "";
+      // Ne pas réinitialiser les précipitations pour permettre de réutiliser les mêmes paramètres
     }
 
     function removeEntry(index) {
@@ -376,8 +390,20 @@
       syncSliderValue("days_past","days_past_value","jours");
       syncSliderValue("days_future","days_future_value","jours");
 
-      document.querySelector('select[name="precipitation_type"]').value = entry.precipitation_type || "minimum";
-      document.querySelector('input[name="precipitation_value"]').value = entry.precipitation_value || "";
+      // Gérer les précipitations avec la nouvelle structure
+      if (entry.wants_rain !== undefined) {
+        $("wants_rain").checked = entry.wants_rain;
+        syncRainVisibility();
+        if (entry.rain_levels && Array.isArray(entry.rain_levels)) {
+          document.querySelectorAll('input[name="rain_levels"]').forEach(cb => {
+            cb.checked = entry.rain_levels.includes(cb.value);
+          });
+        }
+      } else {
+        // Compatibilité avec l'ancien format
+        $("wants_rain").checked = false;
+        syncRainVisibility();
+      }
 
       document.querySelector('select[name="wind_type"]').value = entry.wind_type || "minimum";
       document.querySelector('input[name="wind_value"]').value = entry.wind_value || "";
@@ -430,8 +456,22 @@
         const tempLabel = entry.temperature_type === "minimum" ? "Température ≥" : "Température ≤";
         const tempValue = formatOrDash(entry.temperature_value, "°C");
 
-        const precipLabel = entry.precipitation_type === "minimum" ? "Précipitations ≥" : "Précipitations ≤";
-        const precipValue = formatOrDash(entry.precipitation_value, " mm");
+        // Afficher les précipitations avec la nouvelle structure
+        let precipLabel = "Précipitations";
+        let precipValue = "—";
+        if (entry.wants_rain && entry.rain_levels && entry.rain_levels.length > 0) {
+          const levels = [];
+          if (entry.rain_levels.includes("weak")) levels.push("Faible (1-3 mm/h)");
+          if (entry.rain_levels.includes("moderate")) levels.push("Modérée (4-7 mm/h)");
+          if (entry.rain_levels.includes("strong")) levels.push("Forte (≥8 mm/h)");
+          precipValue = levels.join(", ");
+        } else if (entry.wants_rain === false) {
+          precipValue = "Aucune pluie";
+        } else {
+          // Compatibilité avec l'ancien format
+          precipLabel = entry.precipitation_type === "minimum" ? "Précipitations ≥" : "Précipitations ≤";
+          precipValue = formatOrDash(entry.precipitation_value, " mm");
+        }
 
         const windLabel = entry.wind_type === "minimum" ? "Vent ≥" : "Vent ≤";
         const windValue = formatOrDash(entry.wind_value, " km/h");
@@ -552,15 +592,30 @@
         <div class="threshold-grid">
           <div class="threshold-card">
             <h3>Précipitations</h3>
-            <div class="threshold-inputs">
-              <select name="precipitation_type">
-                {% set precip_type = (form_data.precipitation_type if form_data else 'minimum') %}
-                <option value="minimum" {% if precip_type == 'minimum' %}selected{% endif %}>Minimum</option>
-                <option value="maximum" {% if precip_type == 'maximum' %}selected{% endif %}>Maximum</option>
-              </select>
-              <input type="number" step="0.1" min="0" name="precipitation_value" placeholder="mm" value="{{ (form_data.precipitation_value if form_data else '') }}" required />
+            <div style="margin-bottom: 16px;">
+              <div class="checkbox" style="margin: 0 0 12px 0;">
+                <input id="wants_rain" name="wants_rain" type="checkbox" onchange="syncRainVisibility()" {% if form_data and form_data.wants_rain %}checked{% endif %} />
+                <label for="wants_rain" style="margin:0;">Voulez-vous de la pluie ?</label>
+              </div>
+              <div id="rain_levels_block" style="display:none; margin-top: 12px;">
+                <label style="display: block; margin-bottom: 8px; font-weight: 600; color: var(--text-dark);">Seuils de pluie (mm/heure)</label>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                  <div class="checkbox" style="margin: 0;">
+                    <input id="rain_weak" name="rain_levels" type="checkbox" value="weak" {% if form_data and form_data.rain_levels and 'weak' in form_data.rain_levels %}checked{% endif %} />
+                    <label for="rain_weak" style="margin:0;">Pluie faible (1 à 3 mm/heure)</label>
+                  </div>
+                  <div class="checkbox" style="margin: 0;">
+                    <input id="rain_moderate" name="rain_levels" type="checkbox" value="moderate" {% if form_data and form_data.rain_levels and 'moderate' in form_data.rain_levels %}checked{% endif %} />
+                    <label for="rain_moderate" style="margin:0;">Pluie modérée (4 à 7 mm/heure)</label>
+                  </div>
+                  <div class="checkbox" style="margin: 0;">
+                    <input id="rain_strong" name="rain_levels" type="checkbox" value="strong" {% if form_data and form_data.rain_levels and 'strong' in form_data.rain_levels %}checked{% endif %} />
+                    <label for="rain_strong" style="margin:0;">Pluie forte (au moins 8 mm/heure)</label>
+                  </div>
+                </div>
+              </div>
             </div>
-            <small class="hint">Valeur en millimètres (mm).</small>
+            <small class="hint">Cochez si vous souhaitez déclencher une alerte en cas de pluie, puis sélectionnez les seuils souhaités.</small>
           </div>
 
           <div class="threshold-card">
