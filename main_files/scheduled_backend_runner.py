@@ -1,13 +1,18 @@
 import json
 import os
+import sys
 from datetime import datetime
 from typing import List, Tuple
 
 import pandas as pd
 
-# Import the necessary functions from frontend.py and moduleMeteo.py
-from frontend import CACHE_PATH, execute_analysis, mark_run, transform_entries
-from moduleMeteo import decision_maker_daily
+# Ajouter le répertoire racine au path pour les imports
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, BASE_DIR)
+
+# Import the necessary functions from data_to_mail.py and weather_analyser.py
+from modules.data_to_mail import CACHE_PATH, execute_analysis, mark_run, transform_entries
+from modules.weather_analyser import decision_maker_daily
 
 
 def evaluate_conditions(entries_raw: str) -> Tuple[bool, List[str]]:

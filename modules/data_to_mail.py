@@ -1,21 +1,16 @@
-from flask import Flask, render_template, request, jsonify
 import os
-import threading
-import time
-import webbrowser
 import re
 import json
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
-
 import pandas as pd
-from apscheduler.schedulers.background import BackgroundScheduler
-
-from moduleMeteo import decision_maker_daily
-from mailSendingModule import envoyer_email
+from modules.weather_analyser import decision_maker_daily
+from modules.mail_sending_module import envoyer_email
 
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# BASE_DIR pointe vers la racine du projet (un niveau au-dessus de modules/)
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CACHE_PATH = os.path.join(BASE_DIR, "data", "cache.json")
 
 
 def load_env_file(path: str) -> None:
@@ -39,15 +34,6 @@ def load_env_file(path: str) -> None:
                     os.environ[key] = value
     except Exception:
         pass
-
-
-load_env_file(os.path.join(BASE_DIR, ".env"))
-
-
-# Les templates sont situés dans le même dossier que ce script
-app = Flask(__name__, template_folder=BASE_DIR)
-scheduler = BackgroundScheduler()
-CACHE_PATH = os.path.join(BASE_DIR, "cache.json")
 
 
 def sanitize_store_name(name: str) -> str:
@@ -329,7 +315,7 @@ def build_email_body(store_label: str, store_meta: dict, store_daily: pd.DataFra
     lines.extend([
         "",
         "Cordialement,",
-        "L’équipe Wellpack",
+        "L'équipe Wellpack",
     ])
     return "\n".join(lines)
 
@@ -512,70 +498,4 @@ def mark_run(cache: dict) -> None:
             json.dump(cache, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
-
-
-@app.route("/", methods=["GET"]) 
-def index():
-    return render_template("index.html")
-
-
-@app.route("/submit", methods=["POST"]) 
-def submit():
-    entries_payload = request.form.get("entries_payload", "[]")
-    summary, stores_results, issues, smtp_context = execute_analysis(entries_payload)
-
-    try:
-        if os.path.exists(CACHE_PATH):
-            with open(CACHE_PATH, "r", encoding="utf-8") as f:
-                cache = json.load(f) or {}
-        else:
-            cache = {}
-    except Exception:
-        cache = {}
-
-    cache["last_input"] = entries_payload
-    cache["state"] = bool(summary.get("emails_sent", 0))
-
-    try:
-        mark_run(cache)
-    except Exception:
-        pass
-
-    if summary.get("total", 0) == 0 and issues:
-        error_message = issues[0]
-        return render_template(
-            "index.html",
-            error_message=error_message,
-            form_data={"entries_payload": entries_payload},
-        )
-
-    return render_template(
-        "results.html",
-        summary=summary,
-        stores=stores_results,
-        issues=issues,
-        smtp=smtp_context,
-    )
-
-
-@app.route("/cron", methods=["POST", "GET"])
-def cron():
-    return jsonify({"ok": False, "reason": "deprecated_endpoint"}), 404
-
-
-if __name__ == "__main__":
-    # Ouvre automatiquement le navigateur en HTTP simple
-    def open_browser():
-        time.sleep(1)
-        webbrowser.open_new("http://127.0.0.1:5000")
-
-    threading.Thread(target=open_browser, daemon=True).start()
-
-    try:
-        scheduler.start()
-    except Exception:
-        pass
-
-    app.run(host="127.0.0.1", port=5000, debug=True, use_reloader=True)
-
 
