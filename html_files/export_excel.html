@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Exporter/Importer fichier Excel - Configuration</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    :root {
+      --bg-white: #ffffff;
+      --bg-muted: #f7f8fb;
+      --text-dark: #1e1e1e;
+      --text-muted: #505968;
+      --border: #eaeaea;
+      --accent: #f8a81e;
+      --accent-dark: #d68b0f;
+      --midnight: #0d1b2a;
+      --success: #34c759;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: linear-gradient(120deg, #0dbdd9 0%, #07a5d3 35%, #f4ae1c 100%);
+      color: var(--text-dark);
+      min-height: 100vh;
+    }
+
+    header {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 64px 24px 48px;
+    }
+
+    .hero-card {
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, rgba(13, 27, 42, 0.94), rgba(13, 27, 42, 0.76));
+      border-radius: 28px;
+      padding: 48px 56px;
+      color: var(--bg-white);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 34px 70px rgba(13,27,42,0.32);
+    }
+
+    .hero-card h1 {
+      position: relative;
+      margin: 0;
+      font-size: 40px;
+      font-weight: 800;
+      letter-spacing: -0.6px;
+    }
+
+    main {
+      max-width: 1040px;
+      margin: 0 auto 72px;
+      padding: 0 24px 48px;
+    }
+
+    .container {
+      position: relative;
+      background: linear-gradient(155deg, rgba(255,255,255,0.98) 0%, rgba(255,255,255,0.94) 48%, rgba(255,255,255,0.88) 100%);
+      border-radius: 28px;
+      padding: 44px 48px;
+      box-shadow: 0 34px 80px rgba(13,27,42,0.26);
+      border: 1px solid rgba(255,255,255,0.6);
+      backdrop-filter: blur(10px);
+    }
+
+    h2.section-title {
+      margin: 0 0 8px;
+      font-size: 22px;
+      font-weight: 600;
+      color: var(--midnight);
+    }
+
+    p.sub { margin: 0 0 24px; color: var(--text-muted); line-height: 1.5; }
+
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 18px;
+      padding: 48px 32px;
+      text-align: center;
+      background: var(--bg-muted);
+      transition: border-color 0.3s, background 0.3s;
+      cursor: pointer;
+    }
+
+    .upload-area:hover {
+      border-color: var(--accent);
+      background: rgba(248,168,30,0.05);
+    }
+
+    .upload-area.dragover {
+      border-color: var(--accent);
+      background: rgba(248,168,30,0.1);
+    }
+
+    .upload-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .upload-text {
+      font-size: 16px;
+      color: var(--text-dark);
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .upload-hint {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    input[type="file"] {
+      display: none;
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      justify-content: flex-end;
+      margin-top: 24px;
+    }
+
+    .btn {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 20px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: var(--bg-white);
+      box-shadow: 0 16px 30px rgba(248,168,30,0.35);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 18px 34px rgba(248,168,30,0.42);
+      background: var(--accent-dark);
+    }
+
+    .btn-secondary {
+      background: var(--midnight);
+      color: var(--bg-white);
+    }
+
+    .btn-secondary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 28px rgba(13,27,42,0.28);
+    }
+
+    .message {
+      background: rgba(52,199,89,0.1);
+      color: var(--success);
+      border: 1px solid rgba(52,199,89,0.3);
+      padding: 12px 14px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+
+    footer {
+      text-align: center;
+      margin: 36px 0;
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="hero-card">
+      <h1>Exporter/Importer fichier Excel</h1>
+      <p>Remplissez le fichier Conditions.xlsx avec vos données et importez-le ici.</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <h2 class="section-title">Export/Import Excel</h2>
+      <p class="sub">Téléchargez le modèle Excel, remplissez-le avec vos données, puis importez-le ci-dessous.</p>
+
+      {% if message %}
+      <div class="message">{{ message }}</div>
+      {% endif %}
+
+      <form method="post" enctype="multipart/form-data" id="uploadForm">
+        <div class="upload-area" id="uploadArea" onclick="document.getElementById('excelFile').click()">
+          <div class="upload-icon">📊</div>
+          <div class="upload-text">Cliquez pour sélectionner ou glissez-déposez votre fichier Excel</div>
+          <div class="upload-hint">Format accepté: .xlsx (Conditions.xlsx)</div>
+        </div>
+        <input type="file" id="excelFile" name="excel_file" accept=".xlsx" required />
+        <div id="fileName" style="margin-top: 16px; font-weight: 600; color: var(--midnight);"></div>
+
+        <div class="actions">
+          <a href="/" class="btn btn-secondary" style="text-decoration: none; display: inline-block;">Retour</a>
+          <button type="submit" class="btn btn-primary">Importer le fichier</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <footer>
+    © 2025 Trigger Météo · Plateforme pilotée par les données
+  </footer>
+
+  <script>
+    const uploadArea = document.getElementById('uploadArea');
+    const fileInput = document.getElementById('excelFile');
+    const fileName = document.getElementById('fileName');
+
+    fileInput.addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        fileName.textContent = `Fichier sélectionné: ${e.target.files[0].name}`;
+      }
+    });
+
+    uploadArea.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      uploadArea.classList.add('dragover');
+    });
+
+    uploadArea.addEventListener('dragleave', () => {
+      uploadArea.classList.remove('dragover');
+    });
+
+    uploadArea.addEventListener('drop', (e) => {
+      e.preventDefault();
+      uploadArea.classList.remove('dragover');
+      if (e.dataTransfer.files.length > 0) {
+        fileInput.files = e.dataTransfer.files;
+        fileName.textContent = `Fichier sélectionné: ${e.dataTransfer.files[0].name}`;
+      }
+    });
+  </script>
+</body>
+</html>
+

@@ -353,6 +353,8 @@
     .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 18px 34px rgba(248,168,30,0.42); background: var(--accent-dark); }
     .btn-secondary { background: var(--midnight); color: var(--bg-white); }
     .btn-secondary:hover { transform: translateY(-1px); box-shadow: 0 12px 28px rgba(13,27,42,0.28); }
+    .btn-excel { background: #f4ae1c; color: var(--bg-white); box-shadow: 0 16px 30px rgba(244,174,28,0.35); }
+    .btn-excel:hover { transform: translateY(-1px); box-shadow: 0 18px 34px rgba(244,174,28,0.42); background: #e09a15; }
 
     .error { background: rgba(255,71,87,0.08); color: #b32020; border: 1px solid rgba(255,71,87,0.2); padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
     small.hint { color: var(--text-muted); }
@@ -565,6 +567,21 @@
       $("days_future").value = 3;
       syncSliderValue('days_past','days_past_value','jour');
       syncSliderValue('days_future','days_future_value','jour');
+    }
+
+    function downloadExcelTemplate() {
+      // Télécharger le fichier Excel
+      const link = document.createElement('a');
+      link.href = '/download-excel-template';
+      link.download = 'Conditions.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Rediriger vers la page d'export après un court délai
+      setTimeout(() => {
+        window.location.href = '/export-excel';
+      }, 500);
     }
 
     function updateEntriesView() {
@@ -814,7 +831,8 @@
       <div class="actions">
         <button type="button" class="btn btn-secondary" onclick="resetEntries()">Tout effacer</button>
         <button type="button" class="btn btn-secondary" onclick="addEntry()">+ Ajouter ce point de vente</button>
-        <button type="submit" class="btn btn-primary">Lancer l’analyse météo</button>
+        <button type="button" class="btn btn-excel" onclick="downloadExcelTemplate()">Exporter le fichier Excel</button>
+        <button type="submit" class="btn btn-primary">Lancer l'analyse météo</button>
       </div>
 
       <div class="entries-section">

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_file
 import os
 import sys
 import json
@@ -73,6 +73,25 @@ def submit():
 @app.route("/cron", methods=["POST", "GET"])
 def cron():
     return jsonify({"ok": False, "reason": "deprecated_endpoint"}), 404
+
+
+@app.route("/download-excel-template", methods=["GET"])
+def download_excel_template():
+    """Télécharge le fichier Excel Conditions.xlsx"""
+    excel_path = os.path.join(BASE_DIR, "Conditions.xlsx")
+    if os.path.exists(excel_path):
+        return send_file(excel_path, as_attachment=True, download_name="Conditions.xlsx")
+    return jsonify({"error": "Fichier Excel non trouvé"}), 404
+
+
+@app.route("/export-excel", methods=["GET", "POST"])
+def export_excel():
+    """Page d'export/import du fichier Excel rempli"""
+    if request.method == "POST":
+        # Pour l'instant, juste afficher un message
+        # La fonctionnalité sera ajoutée plus tard
+        return render_template("export_excel.html", message="Fichier reçu (fonctionnalité à implémenter)")
+    return render_template("export_excel.html")
 
 
 if __name__ == "__main__":
