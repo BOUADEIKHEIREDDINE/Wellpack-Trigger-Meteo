@@ -70,101 +70,251 @@ def parse_int(
     return result
 
 
+def _parse_precip_cell(value) -> Tuple[bool, List[str]]:
+    """
+    Convertit le contenu de la colonne 'Précipitations' du fichier Excel
+    en (wants_rain, rain_levels).
+    """
+    if value in (None, "", " "):
+        return False, []
+
+    text = str(value).strip().lower()
+    wants_rain = True
+    levels: List[str] = []
+
+    if "tout" in text:
+        # Tout niveau de pluie
+        levels = ["weak", "moderate", "strong"]
+    else:
+        if "faible" in text:
+            levels.append("weak")
+        if "modér" in text or "modere" in text:
+            levels.append("moderate")
+        if "forte" in text or "fort" in text:
+            levels.append("strong")
+
+    if not levels:
+        # Texte non reconnu → considérer comme pas de pluie
+        return False, []
+
+    return wants_rain, levels
+
+
+_THRESHOLD_RE = re.compile(r"([<>]=?)\s*([-+]?\d+(?:[.,]\d+)?)")
+
+
+def _parse_threshold_cell(value) -> Tuple[Optional[str], Optional[float]]:
+    """
+    Analyse une cellule de type '< x' ou '> x' et retourne (type, valeur).
+    type ∈ {'minimum','maximum'} ou None si non exploitable.
+    """
+    if value in (None, "", " "):
+        return None, None
+
+    s = str(value).strip()
+    m = _THRESHOLD_RE.match(s)
+    if not m:
+        return None, None
+
+    op, num = m.groups()
+    try:
+        val = float(str(num).replace(",", "."))
+    except (TypeError, ValueError):
+        return None, None
+
+    # '>' → minimum, '<' → maximum
+    threshold_type = "minimum" if ">" in op else "maximum"
+    return threshold_type, val
+
+
+def build_entries_from_excel(file_obj) -> List[dict]:
+    """
+    Construit la liste d'entrées (entries) à partir du fichier Excel Conditions.xlsx.
+
+    Mapping des cellules (1-based):
+      - Nom du magasin global: C1 (non utilisé directement dans les entrées)
+      - Email global: C2
+      - Lignes par filiale à partir de la ligne 4:
+          * Nom filiale: C4, C5, C6, ...
+          * Code postal: D4, D5, D6, ...
+          * J-x: E4, E5, ...
+          * J+x: F4, F5, ...
+          * Précipitations: G4, G5, ...
+          * Vent: H4, H5, ...
+          * Température: I4, I5, ...
+          * Indice UV: J4, J5, ...
+          * Fréquence d'analyse: K4, K5, ... (actuellement non utilisée)
+    """
+    # Lecture brute sans en-têtes
+    df = pd.read_excel(file_obj, header=None)
+
+    # Email global en C2 → row 1, col 2 (0-based)
+    email_global = ""
+    try:
+        val = df.iat[1, 2]
+        if val is not None and not (isinstance(val, float) and pd.isna(val)):
+            email_global = str(val).strip()
+    except Exception:
+        email_global = ""
+
+    entries: List[dict] = []
+
+    # Lignes filiales à partir de l'index 3 (ligne 4 Excel)
+    for row_idx in range(3, len(df)):
+        try:
+            store_name = df.iat[row_idx, 2]  # C
+            postal_code = df.iat[row_idx, 3]  # D
+        except Exception:
+            continue
+
+        if (store_name is None or (isinstance(store_name, float) and pd.isna(store_name))) and (
+            postal_code is None or (isinstance(postal_code, float) and pd.isna(postal_code))
+        ):
+            # Ligne vide → on considère que la liste est terminée
+            continue
+
+        store_name_str = "" if store_name is None else str(store_name).strip()
+        postal_code_str = "" if postal_code is None else str(postal_code).strip()
+
+        if not store_name_str and not postal_code_str:
+            # Rien d'exploitable sur cette ligne
+            continue
+
+        # J-x et J+x
+        days_past_raw = df.iat[row_idx, 4] if df.shape[1] > 4 else 0
+        days_future_raw = df.iat[row_idx, 5] if df.shape[1] > 5 else 0
+        days_past = parse_int(days_past_raw or 0, default=0, minimum=0, maximum=5)
+        days_future = parse_int(days_future_raw or 0, default=0, minimum=0, maximum=5)
+
+        # Précipitations
+        precip_raw = df.iat[row_idx, 6] if df.shape[1] > 6 else None
+        wants_rain, rain_levels = _parse_precip_cell(precip_raw)
+
+        # Vent
+        wind_raw = df.iat[row_idx, 7] if df.shape[1] > 7 else None
+        wind_type, wind_value = _parse_threshold_cell(wind_raw)
+        wind_value_str = "" if wind_value is None else str(wind_value)
+        if wind_type is None:
+            # Valeur non exploitable → fallback minimum 0
+            wind_type = "minimum"
+            wind_value_str = "0"
+
+        # Température
+        temp_raw = df.iat[row_idx, 8] if df.shape[1] > 8 else None
+        temp_type, temp_value = _parse_threshold_cell(temp_raw)
+        temp_value_str = "" if temp_value is None else str(temp_value)
+        if temp_type is None:
+            temp_type = "minimum"
+            temp_value_str = "0"
+
+        # Indice UV (on utilise juste la valeur numérique comme uv_min)
+        uv_raw = df.iat[row_idx, 9] if df.shape[1] > 9 else None
+        _, uv_value = _parse_threshold_cell(uv_raw)
+        uv_value_str = "" if uv_value is None else str(uv_value)
+
+        entry = {
+            "store_name": store_name_str,
+            "postal_code": postal_code_str,
+            "contact_email": email_global,
+            "analyze_past": days_past > 0,
+            "days_past": days_past,
+            "days_future": days_future,
+            "wants_rain": wants_rain,
+            "rain_levels": rain_levels,
+            "wind_type": wind_type,
+            "wind_value": wind_value_str,
+            "temperature_type": temp_type,
+            "temperature_value": temp_value_str,
+            "uv_min": uv_value_str,
+        }
+
+        entries.append(entry)
+
+    return entries
+
 def build_conditions(entry: dict, temp_value: float, precip_value: Optional[float], wind_value: float, uv_value: Optional[float]
                      ) -> Tuple[Dict[str, float], Dict[str, float]]:
     conditions: Dict[str, float] = {}
     display: Dict[str, float] = {}
 
-    # Flags d'activation par condition (par défaut: toutes actives pour compatibilité)
-    enable_temperature = bool(entry.get("enable_temperature", True))
-    enable_precipitation = bool(entry.get("enable_precipitation", True))
-    enable_wind = bool(entry.get("enable_wind", True))
-    enable_uv = bool(entry.get("enable_uv", True))
+    temp_type = entry.get("temperature_type", "minimum")
+    if temp_type == "minimum":
+        conditions["temp_min"] = temp_value
+        display["temp_min"] = temp_value
+    else:
+        conditions["temp_max"] = temp_value
+        display["temp_max"] = temp_value
 
-    # Température
-    if enable_temperature and temp_value is not None:
-        temp_type = entry.get("temperature_type", "minimum")
-        if temp_type == "minimum":
-            conditions["temp_min"] = temp_value
-            display["temp_min"] = temp_value
+    # Gérer les précipitations avec la nouvelle structure
+    wants_rain = entry.get("wants_rain", False)
+    rain_levels = entry.get("rain_levels", [])
+    
+    if isinstance(rain_levels, str):
+        # Si c'est une chaîne, la convertir en liste
+        rain_levels = [rain_levels] if rain_levels else []
+    
+    if wants_rain and rain_levels:
+        # Calculer les plages de précipitations selon les seuils sélectionnés
+        # weak: 1-3 mm/h, moderate: 4-7 mm/h, strong: >=8 mm/h
+        min_precip = None
+        max_precip = None
+        
+        if "weak" in rain_levels:
+            min_precip = 1.0 if min_precip is None else min(min_precip, 1.0)
+            max_precip = 3.0 if max_precip is None else max(max_precip, 3.0)
+        
+        if "moderate" in rain_levels:
+            min_precip = 4.0 if min_precip is None else min(min_precip, 4.0)
+            max_precip = 7.0 if max_precip is None else max(max_precip, 7.0)
+        
+        if "strong" in rain_levels:
+            min_precip = 8.0 if min_precip is None else min(min_precip, 8.0)
+            max_precip = None  # Pas de limite supérieure pour la pluie forte
+        
+        if min_precip is not None:
+            conditions["precip_min"] = min_precip
+            conditions["precipitations_min"] = min_precip
+            display["precip_min"] = min_precip
+        
+        if max_precip is not None:
+            conditions["precip_max"] = max_precip
+            conditions["precipitations_max"] = max_precip
+            display["precip_max"] = max_precip
         else:
-            conditions["temp_max"] = temp_value
-            display["temp_max"] = temp_value
-
-    # Précipitations (ne rien ajouter si la condition est désactivée)
-    if enable_precipitation:
-        wants_rain = entry.get("wants_rain", False)
-        rain_levels = entry.get("rain_levels", [])
-
-        if isinstance(rain_levels, str):
-            # Si c'est une chaîne, la convertir en liste
-            rain_levels = [rain_levels] if rain_levels else []
-
-        if wants_rain and rain_levels:
-            # Calculer les plages de précipitations selon les seuils sélectionnés
-            # weak: 1-3 mm/h, moderate: 4-7 mm/h, strong: >=8 mm/h
-            min_precip = None
-            max_precip = None
-
-            if "weak" in rain_levels:
-                min_precip = 1.0 if min_precip is None else min(min_precip, 1.0)
-                max_precip = 3.0 if max_precip is None else max(max_precip, 3.0)
-
-            if "moderate" in rain_levels:
-                min_precip = 4.0 if min_precip is None else min(min_precip, 4.0)
-                max_precip = 7.0 if max_precip is None else max(max_precip, 7.0)
-
-            if "strong" in rain_levels:
-                min_precip = 8.0 if min_precip is None else min(min_precip, 8.0)
-                max_precip = None  # Pas de limite supérieure pour la pluie forte
-
-            if min_precip is not None:
-                conditions["precip_min"] = min_precip
-                conditions["precipitations_min"] = min_precip
-                display["precip_min"] = min_precip
-
-            if max_precip is not None:
-                conditions["precip_max"] = max_precip
-                conditions["precipitations_max"] = max_precip
-                display["precip_max"] = max_precip
+            # Si seule la pluie forte est sélectionnée, on définit seulement le minimum
+            if "strong" in rain_levels and len(rain_levels) == 1:
+                conditions["precip_min"] = 8.0
+                conditions["precipitations_min"] = 8.0
+                display["precip_min"] = 8.0
+    elif not wants_rain:
+        # Si l'utilisateur ne veut pas de pluie, définir un maximum à 0
+        conditions["precip_max"] = 0.0
+        conditions["precipitations_max"] = 0.0
+        display["precip_max"] = 0.0
+    else:
+        # Compatibilité avec l'ancien format (precipitation_type/precipitation_value)
+        precip_type = entry.get("precipitation_type", "minimum")
+        if precip_value is not None:
+            if precip_type == "minimum":
+                conditions["precip_min"] = precip_value
+                conditions["precipitations_min"] = precip_value
+                display["precip_min"] = precip_value
             else:
-                # Si seule la pluie forte est sélectionnée, on définit seulement le minimum
-                if "strong" in rain_levels and len(rain_levels) == 1:
-                    conditions["precip_min"] = 8.0
-                    conditions["precipitations_min"] = 8.0
-                    display["precip_min"] = 8.0
-        elif wants_rain is False:
-            # Si l'utilisateur ne veut pas de pluie, définir un maximum à 0
-            conditions["precip_max"] = 0.0
-            conditions["precipitations_max"] = 0.0
-            display["precip_max"] = 0.0
-        else:
-            # Compatibilité avec l'ancien format (precipitation_type/precipitation_value)
-            precip_type = entry.get("precipitation_type", "minimum")
-            if precip_value is not None:
-                if precip_type == "minimum":
-                    conditions["precip_min"] = precip_value
-                    conditions["precipitations_min"] = precip_value
-                    display["precip_min"] = precip_value
-                else:
-                    conditions["precip_max"] = precip_value
-                    conditions["precipitations_max"] = precip_value
-                    display["precip_max"] = precip_value
+                conditions["precip_max"] = precip_value
+                conditions["precipitations_max"] = precip_value
+                display["precip_max"] = precip_value
 
-    # Vent
-    if enable_wind and wind_value is not None:
-        wind_type = entry.get("wind_type", "minimum")
-        if wind_type == "minimum":
-            conditions["vent_min"] = wind_value
-            conditions["vitesse_vent_min"] = wind_value
-            display["vent_min"] = wind_value
-        else:
-            conditions["vent_max"] = wind_value
-            conditions["vitesse_vent_max"] = wind_value
-            display["vent_max"] = wind_value
+    wind_type = entry.get("wind_type", "minimum")
+    if wind_type == "minimum":
+        conditions["vent_min"] = wind_value
+        conditions["vitesse_vent_min"] = wind_value
+        display["vent_min"] = wind_value
+    else:
+        conditions["vent_max"] = wind_value
+        conditions["vitesse_vent_max"] = wind_value
+        display["vent_max"] = wind_value
 
-    # UV
-    if enable_uv and uv_value is not None:
+    if uv_value is not None:
         conditions["uv_min"] = uv_value
         display["uv_min"] = uv_value
 
@@ -183,11 +333,6 @@ def transform_entries(entries: List[dict]) -> Tuple[List[dict], Dict[str, dict],
         contact_email = (entry.get("contact_email") or "").strip()
         analyze_past = bool(entry.get("analyze_past"))
 
-        enable_temperature = bool(entry.get("enable_temperature", True))
-        enable_precipitation = bool(entry.get("enable_precipitation", True))
-        enable_wind = bool(entry.get("enable_wind", True))
-        enable_uv = bool(entry.get("enable_uv", True))
-
         errors = []
         if not store_name:
             errors.append("nom du magasin manquant")
@@ -197,31 +342,30 @@ def transform_entries(entries: List[dict]) -> Tuple[List[dict], Dict[str, dict],
             errors.append("email invalide")
 
         temp_value = parse_float(entry.get("temperature_value"))
-        if enable_temperature and temp_value is None:
+        if temp_value is None:
             errors.append("température invalide")
 
-        # Gérer les précipitations avec la nouvelle structure, seulement si la condition est activée
+        # Gérer les précipitations avec la nouvelle structure
         wants_rain = entry.get("wants_rain")
         rain_levels = entry.get("rain_levels", [])
-
+        
         # Compatibilité avec l'ancien format
         precip_value = parse_float(entry.get("precipitation_value"))
-
-        if enable_precipitation:
-            if wants_rain is None:
-                # Ancien format : utiliser precipitation_value
-                if precip_value is None:
-                    errors.append("précipitations invalides")
-            else:
-                # Nouveau format : vérifier que si wants_rain est True, au moins un seuil est sélectionné
-                if wants_rain:
-                    if isinstance(rain_levels, str):
-                        rain_levels = [rain_levels] if rain_levels else []
-                    if not rain_levels or len(rain_levels) == 0:
-                        errors.append("si vous voulez de la pluie, sélectionnez au moins un seuil")
+        
+        if wants_rain is None:
+            # Ancien format : utiliser precipitation_value
+            if precip_value is None:
+                errors.append("précipitations invalides")
+        else:
+            # Nouveau format : vérifier que si wants_rain est True, au moins un seuil est sélectionné
+            if wants_rain:
+                if isinstance(rain_levels, str):
+                    rain_levels = [rain_levels] if rain_levels else []
+                if not rain_levels or len(rain_levels) == 0:
+                    errors.append("si vous voulez de la pluie, sélectionnez au moins un seuil")
 
         wind_value = parse_float(entry.get("wind_value"))
-        if enable_wind and wind_value is None:
+        if wind_value is None:
             errors.append("vitesse du vent invalide")
 
         uv_value = parse_float(entry.get("uv_min"))
