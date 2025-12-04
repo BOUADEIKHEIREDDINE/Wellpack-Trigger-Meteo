@@ -323,10 +323,81 @@
       padding: 20px;
       background: linear-gradient(160deg, rgba(13,27,42,0.03), rgba(248,168,30,0.06));
       box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 22px 38px rgba(13,27,42,0.12);
+      transition: background 0.35s ease, box-shadow 0.35s ease, transform 0.25s ease, opacity 0.25s ease;
+      position: relative;
+    }
+    .threshold-card.active {
+      transform: translateY(-2px);
+      box-shadow: 0 26px 45px rgba(13,27,42,0.15);
+    }
+    .threshold-card.inactive {
+      background: rgba(255,255,255,0.65);
+      opacity: 0.7;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+    }
+    @keyframes cardPulse {
+      0% { box-shadow: 0 0 0 rgba(248,168,30,0.0); }
+      60% { box-shadow: 0 0 25px rgba(248,168,30,0.45); }
+      100% { box-shadow: 0 0 0 rgba(248,168,30,0.0); }
+    }
+    .threshold-card.pulse {
+      animation: cardPulse 0.5s ease;
     }
     .threshold-card h3 { margin: 0 0 12px; font-size: 16px; color: var(--midnight); }
     .threshold-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .threshold-card small { color: var(--text-muted); }
+    .condition-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .condition-header h3 {
+      margin: 0;
+      font-size: 16px;
+      color: var(--midnight);
+    }
+    .condition-toggle {
+      position: relative;
+      width: 46px;
+      height: 26px;
+      display: inline-flex;
+      align-items: center;
+      cursor: pointer;
+    }
+    .condition-toggle input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+      position: absolute;
+    }
+    .condition-toggle .toggle-slider {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: rgba(13,27,42,0.2);
+      border-radius: 999px;
+      transition: background 0.25s ease;
+    }
+    .condition-toggle .toggle-slider::after {
+      content: "";
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #fff;
+      top: 3px;
+      left: 3px;
+      box-shadow: 0 4px 10px rgba(13,27,42,0.2);
+      transition: transform 0.25s ease;
+    }
+    .condition-toggle input:checked + .toggle-slider {
+      background: linear-gradient(135deg, #0dbdd9, #f8a81e);
+    }
+    .condition-toggle input:checked + .toggle-slider::after {
+      transform: translateX(20px);
+    }
 
     .entries-section { margin-top: 40px; border-top: 1px solid var(--border); padding-top: 28px; }
     .entries-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin-top: 18px; }
@@ -390,6 +461,51 @@
       }
     }
 
+    const conditionFieldMap = {
+      precipitation: () => {
+        const elements = [
+          $("wants_rain"),
+          ...Array.from(document.querySelectorAll('input[name="rain_levels"]')),
+        ];
+        return elements.filter(Boolean);
+      },
+      wind: () => [
+        document.getElementById("wind_type"),
+        document.getElementById("wind_value"),
+      ].filter(Boolean),
+      temperature: () => [
+        document.getElementById("temperature_type"),
+        document.getElementById("temperature_value"),
+      ].filter(Boolean),
+      uv: () => [
+        document.getElementById("uv_min"),
+      ].filter(Boolean),
+    };
+
+    function toggleCondition(conditionKey, initial = false) {
+      const checkbox = document.getElementById(`enable_${conditionKey}`);
+      if (!checkbox) return;
+      const enabled = checkbox.checked;
+      const card = document.querySelector(`[data-condition-card="${conditionKey}"]`);
+      if (card) {
+        card.classList.toggle("inactive", !enabled);
+        card.classList.toggle("active", enabled);
+        if (enabled && !initial) {
+          card.classList.add("pulse");
+          setTimeout(() => card.classList.remove("pulse"), 500);
+        }
+      }
+
+      const fields = conditionFieldMap[conditionKey] ? conditionFieldMap[conditionKey]() : [];
+      fields.forEach((field) => {
+        field.disabled = !enabled;
+      });
+
+      if (conditionKey === "precipitation") {
+        syncRainVisibility();
+      }
+    }
+
     function syncSliderValue(rangeId, labelId, unit) {
       const input = document.getElementById(rangeId);
       const label = document.getElementById(labelId);
@@ -422,6 +538,7 @@
       syncRainVisibility();
       syncSliderValue("days_future", "days_future_value", "jour");
       syncSliderValue("days_past", "days_past_value", "jour");
+      ["precipitation","wind","temperature","uv"].forEach(key => toggleCondition(key, true));
 
       const payloadField = $("entries_payload");
       try {
@@ -453,8 +570,14 @@
     function addEntry() {
       hideClientError();
 
-      const wantsRain = $("wants_rain").checked;
-      const rainLevels = Array.from(document.querySelectorAll('input[name="rain_levels"]:checked')).map(cb => cb.value);
+      const enablePrecipitation = $("enable_precipitation") ? $("enable_precipitation").checked : true;
+      const wantsRain = enablePrecipitation ? $("wants_rain").checked : false;
+      const rainLevels = enablePrecipitation
+        ? Array.from(document.querySelectorAll('input[name="rain_levels"]:checked')).map(cb => cb.value)
+        : [];
+      const enableWind = document.getElementById("enable_wind") ? document.getElementById("enable_wind").checked : true;
+      const enableTemperature = document.getElementById("enable_temperature") ? document.getElementById("enable_temperature").checked : true;
+      const enableUv = document.getElementById("enable_uv") ? document.getElementById("enable_uv").checked : true;
 
       const daysPast = Number($("days_past").value || 0);
       const daysFuture = Number($("days_future").value || 0);
@@ -466,13 +589,17 @@
         analyze_past: daysPast > 0,
         days_past: daysPast,
         days_future: daysFuture,
+        enable_precipitation: enablePrecipitation,
         wants_rain: wantsRain,
         rain_levels: rainLevels,
-        wind_type: document.querySelector('select[name="wind_type"]').value,
-        wind_value: document.querySelector('input[name="wind_value"]').value.trim(),
-        temperature_type: document.querySelector('select[name="temperature_type"]').value,
-        temperature_value: document.querySelector('input[name="temperature_value"]').value.trim(),
-        uv_min: document.querySelector('input[name="uv_min"]').value.trim(),
+        enable_wind: enableWind,
+        wind_type: document.getElementById("wind_type").value,
+        wind_value: document.getElementById("wind_value").value.trim(),
+        enable_temperature: enableTemperature,
+        temperature_type: document.getElementById("temperature_type").value,
+        temperature_value: document.getElementById("temperature_value").value.trim(),
+        enable_uv: enableUv,
+        uv_min: document.getElementById("uv_min").value.trim(),
       };
 
       if (!entry.store_name) {
@@ -487,15 +614,15 @@
         showClientError("Indiquez une adresse e-mail valide.");
         return;
       }
-      if (entry.wants_rain && entry.rain_levels.length === 0) {
+      if (entry.enable_precipitation && entry.wants_rain && entry.rain_levels.length === 0) {
         showClientError("Si vous voulez de la pluie, sélectionnez au moins un seuil.");
         return;
       }
-      if (!entry.wind_value) {
+      if (entry.enable_wind && !entry.wind_value) {
         showClientError("Indiquez une vitesse de vent.");
         return;
       }
-      if (!entry.temperature_value) {
+      if (entry.enable_temperature && !entry.temperature_value) {
         showClientError("Indiquez une température.");
         return;
       }
@@ -506,9 +633,9 @@
       // Conserver le nom du magasin pour saisir plusieurs codes postaux rapidement
       $("postal_code").value = "";
       $("contact_email").value = "";
-      document.querySelector('input[name="wind_value"]').value = "";
-      document.querySelector('input[name="temperature_value"]').value = "";
-      document.querySelector('input[name="uv_min"]').value = "";
+      document.getElementById("wind_value").value = "";
+      document.getElementById("temperature_value").value = "";
+      document.getElementById("uv_min").value = "";
       // Ne pas réinitialiser les précipitations pour permettre de réutiliser les mêmes paramètres
     }
 
@@ -531,6 +658,10 @@
       syncSliderValue("days_future","days_future_value","jour");
 
       // Gérer les précipitations avec la nouvelle structure
+      // Précipitations
+      if (document.getElementById("enable_precipitation")) {
+        $("enable_precipitation").checked = entry.enable_precipitation !== undefined ? entry.enable_precipitation : true;
+      }
       if (entry.wants_rain !== undefined) {
         $("wants_rain").checked = entry.wants_rain;
         syncRainVisibility();
@@ -545,13 +676,27 @@
         syncRainVisibility();
       }
 
-      document.querySelector('select[name="wind_type"]').value = entry.wind_type || "minimum";
-      document.querySelector('input[name="wind_value"]').value = entry.wind_value || "";
+      // Vent
+      if (document.getElementById("enable_wind")) {
+        $("enable_wind").checked = entry.enable_wind !== undefined ? entry.enable_wind : true;
+      }
+      document.getElementById("wind_type").value = entry.wind_type || "minimum";
+      document.getElementById("wind_value").value = entry.wind_value || "";
 
-      document.querySelector('select[name="temperature_type"]').value = entry.temperature_type || "minimum";
-      document.querySelector('input[name="temperature_value"]').value = entry.temperature_value || "";
+      // Température
+      if (document.getElementById("enable_temperature")) {
+        $("enable_temperature").checked = entry.enable_temperature !== undefined ? entry.enable_temperature : true;
+      }
+      document.getElementById("temperature_type").value = entry.temperature_type || "minimum";
+      document.getElementById("temperature_value").value = entry.temperature_value || "";
 
-      document.querySelector('input[name="uv_min"]').value = entry.uv_min || "";
+      // UV
+      if (document.getElementById("enable_uv")) {
+        $("enable_uv").checked = entry.enable_uv !== undefined ? entry.enable_uv : true;
+      }
+      document.getElementById("uv_min").value = entry.uv_min || "";
+
+      ["precipitation","wind","temperature","uv"].forEach(key => toggleCondition(key, true));
 
       entries.splice(index, 1);
       updateEntriesView();
@@ -611,12 +756,14 @@
         const daysAfter = entry.days_future || 0;
 
         const tempLabel = entry.temperature_type === "minimum" ? "Température ≥" : "Température ≤";
-        const tempValue = formatOrDash(entry.temperature_value, "°C");
+        const tempValue = entry.enable_temperature === false ? "Non utilisée" : formatOrDash(entry.temperature_value, "°C");
 
         // Afficher les précipitations avec la nouvelle structure
         let precipLabel = "Précipitations";
         let precipValue = "—";
-        if (entry.wants_rain && entry.rain_levels && entry.rain_levels.length > 0) {
+        if (entry.enable_precipitation === false) {
+          precipValue = "Non utilisée";
+        } else if (entry.wants_rain && entry.rain_levels && entry.rain_levels.length > 0) {
           const levels = [];
           if (entry.rain_levels.includes("weak")) levels.push("Faible (1-3 mm/h)");
           if (entry.rain_levels.includes("moderate")) levels.push("Modérée (4-7 mm/h)");
@@ -631,9 +778,9 @@
         }
 
         const windLabel = entry.wind_type === "minimum" ? "Vent ≥" : "Vent ≤";
-        const windValue = formatOrDash(entry.wind_value, " km/h");
+        const windValue = entry.enable_wind === false ? "Non utilisé" : formatOrDash(entry.wind_value, " km/h");
 
-        const uvValue = entry.uv_min ? formatOrDash(entry.uv_min) : "—";
+        const uvValue = entry.enable_uv === false ? "Non utilisé" : (entry.uv_min ? formatOrDash(entry.uv_min) : "—");
 
         card.innerHTML = `
           <div class="entry-actions-card">
@@ -755,8 +902,14 @@
       <div class="field" style="margin-top:24px;">
         <label>Seuils météo</label>
         <div class="threshold-grid">
-          <div class="threshold-card">
-            <h3>Précipitations</h3>
+          <div class="threshold-card active" data-condition-card="precipitation">
+            <div class="condition-header">
+              <h3>Précipitations</h3>
+              <label class="condition-toggle">
+                <input id="enable_precipitation" name="enable_precipitation" type="checkbox" checked onchange="toggleCondition('precipitation')" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
             <div style="margin-bottom: 16px;">
               <div class="checkbox" style="margin: 0 0 12px 0;">
                 <input id="wants_rain" name="wants_rain" type="checkbox" onchange="syncRainVisibility()" {% if form_data and form_data.wants_rain %}checked{% endif %} />
@@ -783,39 +936,57 @@
             <small class="hint">Cochez si vous souhaitez déclencher une alerte en cas de pluie, puis sélectionnez les seuils souhaités.</small>
           </div>
 
-          <div class="threshold-card">
-            <h3>Vent</h3>
+          <div class="threshold-card active" data-condition-card="wind">
+            <div class="condition-header">
+              <h3>Vent</h3>
+              <label class="condition-toggle">
+                <input id="enable_wind" name="enable_wind" type="checkbox" checked onchange="toggleCondition('wind')" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
             <div class="threshold-inputs">
-              <select name="wind_type">
+              <select name="wind_type" id="wind_type">
                 {% set wind_type = (form_data.wind_type if form_data else 'minimum') %}
                 <option value="minimum" {% if wind_type == 'minimum' %}selected{% endif %}>Minimum</option>
                 <option value="maximum" {% if wind_type == 'maximum' %}selected{% endif %}>Maximum</option>
               </select>
-              <input type="number" step="0.1" min="0" name="wind_value" placeholder="km/h" value="{{ (form_data.wind_value if form_data else '') }}" required />
+              <input type="number" step="0.1" min="0" name="wind_value" id="wind_value" placeholder="km/h" value="{{ (form_data.wind_value if form_data else '') }}" required />
             </div>
             <small class="hint">Vitesse en km/h.</small>
           </div>
 
-          <div class="threshold-card">
-            <h3>Température</h3>
+          <div class="threshold-card active" data-condition-card="temperature">
+            <div class="condition-header">
+              <h3>Température</h3>
+              <label class="condition-toggle">
+                <input id="enable_temperature" name="enable_temperature" type="checkbox" checked onchange="toggleCondition('temperature')" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
             <div class="threshold-inputs">
-              <select name="temperature_type">
+              <select name="temperature_type" id="temperature_type">
                 {% set temperature_type = (form_data.temperature_type if form_data else 'minimum') %}
                 <option value="minimum" {% if temperature_type == 'minimum' %}selected{% endif %}>Minimum</option>
                 <option value="maximum" {% if temperature_type == 'maximum' %}selected{% endif %}>Maximum</option>
               </select>
-              <input type="number" step="0.1" name="temperature_value" placeholder="°C" value="{{ (form_data.temperature_value if form_data else '') }}" required />
+              <input type="number" step="0.1" name="temperature_value" id="temperature_value" placeholder="°C" value="{{ (form_data.temperature_value if form_data else '') }}" required />
             </div>
             <small class="hint">Température en degrés Celsius.</small>
           </div>
 
-          <div class="threshold-card">
-            <h3>Indice UV</h3>
+          <div class="threshold-card active" data-condition-card="uv">
+            <div class="condition-header">
+              <h3>Indice UV</h3>
+              <label class="condition-toggle">
+                <input id="enable_uv" name="enable_uv" type="checkbox" checked onchange="toggleCondition('uv')" />
+                <span class="toggle-slider"></span>
+              </label>
+            </div>
             <div class="threshold-inputs">
               <select disabled style="opacity:0.5; cursor:not-allowed;">
                 <option>Minimum</option>
               </select>
-              <input type="number" step="0.1" min="0" name="uv_min" placeholder="Indice" value="{{ (form_data.uv_min if form_data else '') }}" />
+              <input type="number" step="0.1" min="0" name="uv_min" id="uv_min" placeholder="Indice" value="{{ (form_data.uv_min if form_data else '') }}" />
             </div>
             <small class="hint">Optionnel. Laissez vide si non concerné.</small>
           </div>
