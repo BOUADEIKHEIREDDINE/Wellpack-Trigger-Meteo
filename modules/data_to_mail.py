@@ -70,7 +70,7 @@ def parse_int(
     return result
 
 
-def build_conditions(entry: dict, temp_value: Optional[float], precip_value: Optional[float], wind_value: Optional[float], uv_value: Optional[float]
+def build_conditions(entry: dict, temp_value: float, precip_value: Optional[float], wind_value: float, uv_value: Optional[float]
                      ) -> Tuple[Dict[str, float], Dict[str, float]]:
     conditions: Dict[str, float] = {}
     display: Dict[str, float] = {}
@@ -339,6 +339,10 @@ def build_email_body(store_label: str, store_meta: dict, store_daily: pd.DataFra
 
 
 def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.DataFrame) -> Tuple[Dict[str, dict], dict]:
+    """
+    Envoie désormais UN SEUL email global pour toutes les filiales concernées.
+    L'email est adressé au premier email de contact trouvé dans stores_meta.
+    """
     smtp_email = os.environ.get("SMTP_EMAIL")
     smtp_password = os.environ.get("SMTP_PASSWORD")
     smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
@@ -352,49 +356,161 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
 
     reports: Dict[str, dict] = {}
 
-    for store_label, meta in stores_meta.items():
-        if store_label not in decisions:
+    # Si aucune filiale ne déclenche d'alerte, ne rien envoyer
+    if not decisions:
+        for store_label in stores_meta.keys():
             reports[store_label] = {
                 "sent": False,
                 "message": "Conditions météo non respectées sur toute la période."
             }
-            continue
+        smtp_context = {
+            "configured": smtp_configured,
+            "sender": smtp_email,
+            "server": smtp_server,
+            "port": smtp_port,
+        }
+        return reports, smtp_context
 
-        recipient = decisions.get(store_label)
-        if not recipient or str(recipient).lower() == "nan":
+    # Trouver un email global : premier email de contact non vide
+    global_recipient: Optional[str] = None
+    for meta in stores_meta.values():
+        candidate = meta.get("email")
+        if candidate and str(candidate).lower() != "nan":
+            global_recipient = str(candidate).strip()
+            break
+
+    if not global_recipient:
+        for store_label in stores_meta.keys():
             reports[store_label] = {
                 "sent": False,
-                "message": "Aucune adresse e-mail renseignée pour ce point de vente."
+                "message": "Aucune adresse e-mail globale trouvée pour envoyer la synthèse."
             }
-            continue
+        smtp_context = {
+            "configured": smtp_configured,
+            "sender": smtp_email,
+            "server": smtp_server,
+            "port": smtp_port,
+        }
+        return reports, smtp_context
 
-        if not smtp_configured:
+    if not smtp_configured:
+        for store_label in stores_meta.keys():
             reports[store_label] = {
                 "sent": False,
                 "message": "Identifiants SMTP manquants (variables SMTP_EMAIL et SMTP_PASSWORD)."
             }
-            continue
+        smtp_context = {
+            "configured": smtp_configured,
+            "sender": smtp_email,
+            "server": smtp_server,
+            "port": smtp_port,
+        }
+        return reports, smtp_context
+
+    # Construire un email unique avec un format simplifié
+    conforming_labels = [lbl for lbl in stores_meta.keys() if lbl in decisions]
+
+    lines: List[str] = [
+        "Bonjour,",
+        "",
+        "Les conditions météorologiques configurées ont été vérifiées pour les filiales suivantes :",
+    ]
+
+    for store_label in conforming_labels:
+        lines.append(f"• Filiale {store_label}")
+
+    lines.extend([
+        "",
+        "Les détails par filiale figurent ci-dessous.",
+        "",
+        "🌦️ Détails des filiales conformes",
+        "",
+    ])
+
+    for store_label in conforming_labels:
+        meta = stores_meta.get(store_label, {})
+        window = meta.get("window", {"avant": 0, "apres": 0})
+        periode = f"J-{window.get('avant', 0)} → J+{window.get('apres', 0)}"
+
+        lines.append(f"{store_label} – {meta.get('postal_code', '')}")
+        lines.append(f"Période analysée : {periode}")
+        lines.append("Seuils configurés :")
+
+        # On récupère les valeurs brutes pour temp_min / precip_max / vent_min si disponibles
+        raw_conditions = meta.get("raw_conditions", {})
+        temp_min = raw_conditions.get("temp_min")
+        precip_max = raw_conditions.get("precip_max", raw_conditions.get("precipitations_max"))
+        vent_min = raw_conditions.get("vent_min", raw_conditions.get("vitesse_vent_min"))
+
+        if temp_min is not None:
+            lines.append(f"• Température min : {format_number(temp_min)}°C")
+        if precip_max is not None:
+            lines.append(f"• Précipitations max : {format_number(precip_max)} mm")
+        if vent_min is not None:
+            lines.append(f"• Vent min : {format_number(vent_min)} km/h")
+
+        lines.append("")
 
         store_daily = pd.DataFrame()
         if not df_daily.empty:
             store_daily = df_daily[df_daily["magasin"] == store_label].copy()
 
-        subject = f"Alerte météo déclenchée - {store_label}"
-        body = build_email_body(store_label, meta, store_daily)
+        if store_daily.empty:
+            lines.append("⚠️ Les données météo détaillées n'ont pas pu être récupérées.")
+            lines.append("")
+            continue
 
-        success = envoyer_email(
-            expediteur_email=smtp_email,
-            expediteur_password=smtp_password,
-            destinataire_email=recipient,
-            sujet=subject,
-            corps_message=body,
-            serveur_smtp=smtp_server,
-            port_smtp=smtp_port,
-        )
+        # Choisir une ligne représentative : priorité au jour J, sinon première ligne conforme, sinon première ligne
+        selected_row = None
+        j_rows = store_daily[store_daily.get("jour_relatif") == "J"]
+        if not j_rows.empty:
+            selected_row = j_rows.iloc[0]
+        else:
+            conformes = store_daily[store_daily.get("state") == True]
+            if not conformes.empty:
+                selected_row = conformes.iloc[0]
+            else:
+                selected_row = store_daily.iloc[0]
 
+        date_str = selected_row.get("date") or "N/A"
+        temp = format_number(selected_row.get("temp_12h"))
+        vent = format_number(selected_row.get("vent_12h"))
+        precip = format_number(selected_row.get("precipitations_12h"))
+
+        lines.append(f"Prévision du {date_str} :")
+        lines.append("✅ Conforme")
+        lines.append(f"→ Température : {temp}°C")
+        lines.append(f"→ Vent : {vent} km/h")
+        lines.append(f"→ Précipitations : {precip} mm")
+        lines.append("")
+
+    lines.extend([
+        "",
+        "Cordialement,",
+        "L'équipe Wellpack",
+    ])
+
+    subject = "Synthèse météo – Filiales conformes"
+    body = "\n".join(lines)
+
+    success = envoyer_email(
+        expediteur_email=smtp_email,
+        expediteur_password=smtp_password,
+        destinataire_email=global_recipient,
+        sujet=subject,
+        corps_message=body,
+        serveur_smtp=smtp_server,
+        port_smtp=smtp_port,
+    )
+
+    for store_label in stores_meta.keys():
         reports[store_label] = {
             "sent": bool(success),
-            "message": "Email envoyé avec succès." if success else "Erreur lors de l'envoi de l'email."
+            "message": (
+                f"Synthèse globale envoyée à {global_recipient}."
+                if success else
+                "Erreur lors de l'envoi de l'email de synthèse."
+            ),
         }
 
     smtp_context = {

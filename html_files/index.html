@@ -630,7 +630,7 @@
       entries.push(entry);
       updateEntriesView();
 
-      // Conserver le nom du magasin pour saisir plusieurs codes postaux rapidement
+      // Conserver l'adresse e-mail (unique) et le nom du magasin pour saisir plusieurs codes postaux rapidement
       $("postal_code").value = "";
       $("contact_email").value = "";
       document.getElementById("wind_value").value = "";
@@ -851,21 +851,22 @@
     <form method="post" action="{{ url_for('submit') }}" novalidate>
       <input type="hidden" id="entries_payload" name="entries_payload" value="{{ form_data.entries_payload if form_data and form_data.entries_payload else '[]' }}" />
       <div id="client_error" class="client-error"></div>
+      <div class="field">
+        <label for="contact_email">Adresse e-mail unique pour toutes les filiales</label>
+        <input id="contact_email" name="contact_email" type="email" placeholder="contact@exemple.com" value="{{ (form_data.contact_email if form_data else '') }}" required />
+        <small class="hint">Cette adresse sera utilisée pour envoyer un seul e-mail de synthèse pour toutes les filiales configurées.</small>
+      </div>
+
       <div class="row">
         <div class="field">
-          <label for="store_name">Nom du magasin</label>
+          <label for="store_name">Nom du magasin / filiale</label>
           <input id="store_name" name="store_name" type="text" placeholder="Ex: Decathlon" value="{{ (form_data.store_name if form_data else '') }}" required />
         </div>
         <div class="field">
-          <label for="contact_email">Adresse e-mail à contacter</label>
-          <input id="contact_email" name="contact_email" type="email" placeholder="contact@exemple.com" value="{{ (form_data.contact_email if form_data else '') }}" required />
+          <label for="postal_code">Code postal du point de vente</label>
+          <input id="postal_code" name="postal_code" type="text" placeholder="Ex: 75011" value="{{ (form_data.postal_code if form_data else '') }}" required />
+          <small class="hint">Chaque entrée ajoutée correspond à une filiale spécifique.</small>
         </div>
-      </div>
-
-      <div class="field">
-        <label for="postal_code">Code postal du point de vente</label>
-        <input id="postal_code" name="postal_code" type="text" placeholder="Ex: 75011" value="{{ (form_data.postal_code if form_data else '') }}" required />
-        <small class="hint">Chaque soumission correspond à un point de vente spécifique. Soumettez de nouveau pour un autre code postal.</small>
       </div>
 
       <div class="slider-group timeline-slider">

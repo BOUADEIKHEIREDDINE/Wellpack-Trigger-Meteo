@@ -15,6 +15,7 @@ from modules.data_to_mail import (
     load_env_file,
     execute_analysis,
     mark_run,
+    build_entries_from_excel,
 )
 
 # Charger les variables d'environnement depuis .env
@@ -88,9 +89,60 @@ def download_excel_template():
 def export_excel():
     """Page d'export/import du fichier Excel rempli"""
     if request.method == "POST":
-        # Pour l'instant, juste afficher un message
-        # La fonctionnalité sera ajoutée plus tard
-        return render_template("export_excel.html", message="Fichier reçu (fonctionnalité à implémenter)")
+        excel_file = request.files.get("excel_file")
+        if not excel_file or excel_file.filename == "":
+            return render_template("export_excel.html", message="Veuillez sélectionner un fichier Excel.")
+
+        try:
+            entries = build_entries_from_excel(excel_file)
+        except Exception as exc:
+            return render_template(
+                "export_excel.html",
+                message=f"Erreur lors de la lecture du fichier Excel : {exc}",
+            )
+
+        if not entries:
+            return render_template(
+                "export_excel.html",
+                message="Aucune filiale valide trouvée dans le fichier Excel.",
+            )
+
+        entries_payload = json.dumps(entries, ensure_ascii=False)
+        summary, stores_results, issues, smtp_context = execute_analysis(entries_payload)
+
+        # Mettre à jour le cache comme pour le formulaire classique
+        try:
+            if os.path.exists(CACHE_PATH):
+                with open(CACHE_PATH, "r", encoding="utf-8") as f:
+                    cache = json.load(f) or {}
+            else:
+                cache = {}
+        except Exception:
+            cache = {}
+
+        cache["last_input"] = entries_payload
+        cache["state"] = bool(summary.get("emails_sent", 0))
+
+        try:
+            mark_run(cache)
+        except Exception:
+            pass
+
+        if summary.get("total", 0) == 0 and issues:
+            error_message = issues[0]
+            return render_template(
+                "export_excel.html",
+                message=error_message,
+            )
+
+        return render_template(
+            "results.html",
+            summary=summary,
+            stores=stores_results,
+            issues=issues,
+            smtp=smtp_context,
+        )
+
     return render_template("export_excel.html")
 
 
