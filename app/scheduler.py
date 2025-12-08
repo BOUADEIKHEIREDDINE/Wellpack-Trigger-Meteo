@@ -1,18 +1,12 @@
 import json
-import os
-import sys
 from datetime import datetime
 from typing import List, Tuple
 
 import pandas as pd
 
-# Ajouter le répertoire racine au path pour les imports
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, BASE_DIR)
-
-# Import the necessary functions from data_to_mail.py and weather_analyser.py
-from modules.data_to_mail import CACHE_PATH, execute_analysis, mark_run, transform_entries
-from modules.weather_analyser import decision_maker_daily
+from app.config.settings import CACHE_FILE
+from app.core.data_to_mail import execute_analysis, mark_run, transform_entries
+from app.core.weather_analyser import decision_maker_daily
 
 
 def evaluate_conditions(entries_raw: str) -> Tuple[bool, List[str]]:
@@ -53,12 +47,12 @@ def should_send_mail(previous_state: bool, conditions_ok: bool, first_run: bool)
 
 
 def main():
-    if not os.path.exists(CACHE_PATH):
+    if not CACHE_FILE.exists():
         print("Cache file not found.")
         return
 
     try:
-        with open(CACHE_PATH, "r", encoding="utf-8") as f:
+        with CACHE_FILE.open("r", encoding="utf-8") as f:
             cache = json.load(f)
     except json.JSONDecodeError:
         print("Error decoding cache.json. It might be empty or malformed.")

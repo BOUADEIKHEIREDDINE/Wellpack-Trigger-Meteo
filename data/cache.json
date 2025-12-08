@@ -1,8 +1,0 @@
-{
-  "last_input": "[{\"store_name\":\"khair Bouadi\",\"postal_code\":\"94230\",\"contact_email\":\"khair021224@gmail.com\",\"analyze_past\":true,\"days_past\":2,\"days_future\":3,\"enable_precipitation\":true,\"wants_rain\":true,\"rain_levels\":[\"moderate\"],\"enable_wind\":true,\"wind_type\":\"minimum\",\"wind_value\":\"50\",\"enable_temperature\":true,\"temperature_type\":\"minimum\",\"temperature_value\":\"80\",\"enable_uv\":true,\"uv_min\":\"\"}]",
-  "last_run": "2025-12-08T10:12:56",
-  "state": false,
-  "failure_counters": {
-    "khair Bouadi (94230)": 7
-  }
-}

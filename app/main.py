@@ -1,17 +1,11 @@
 from flask import Flask, render_template, request, jsonify, send_file
-import os
-import sys
 import json
 import threading
 import time
 import webbrowser
 
-# Ajouter le répertoire racine au path pour les imports
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, BASE_DIR)
-
-from modules.data_to_mail import (
-    CACHE_PATH,
+from app.config.settings import BASE_DIR, CACHE_FILE, CONDITIONS_FILE, ENV_FILE, TEMPLATES_DIR
+from app.core.data_to_mail import (
     load_env_file,
     execute_analysis,
     mark_run,
@@ -20,12 +14,11 @@ from modules.data_to_mail import (
 )
 
 # Charger les variables d'environnement depuis .env
-env_path = os.path.join(BASE_DIR, ".env")
-if os.path.exists(env_path):
-    load_env_file(env_path)
+if ENV_FILE.exists():
+    load_env_file(str(ENV_FILE))
 
-# Les templates sont situés dans html_files/
-app = Flask(__name__, template_folder=os.path.join(BASE_DIR, "html_files"))
+# Les templates sont situés dans frontend/templates
+app = Flask(__name__, template_folder=str(TEMPLATES_DIR))
 
 
 @app.route("/", methods=["GET"]) 
@@ -39,8 +32,8 @@ def submit():
     summary, stores_results, issues, smtp_context = execute_analysis(entries_payload)
 
     try:
-        if os.path.exists(CACHE_PATH):
-            with open(CACHE_PATH, "r", encoding="utf-8") as f:
+        if CACHE_FILE.exists():
+            with CACHE_FILE.open("r", encoding="utf-8") as f:
                 cache = json.load(f) or {}
         else:
             cache = {}
@@ -80,9 +73,9 @@ def cron():
 @app.route("/download-excel-template", methods=["GET"])
 def download_excel_template():
     """Télécharge le fichier Excel Conditions.xlsx"""
-    excel_path = os.path.join(BASE_DIR, "Conditions.xlsx")
-    if os.path.exists(excel_path):
-        return send_file(excel_path, as_attachment=True, download_name="Conditions.xlsx")
+    excel_path = CONDITIONS_FILE
+    if excel_path.exists():
+        return send_file(str(excel_path), as_attachment=True, download_name="Conditions.xlsx")
     return jsonify({"error": "Fichier Excel non trouvé"}), 404
 
 
@@ -113,8 +106,8 @@ def export_excel():
 
         # Mettre à jour le cache comme pour le formulaire classique
         try:
-            if os.path.exists(CACHE_PATH):
-                with open(CACHE_PATH, "r", encoding="utf-8") as f:
+            if CACHE_FILE.exists():
+                with CACHE_FILE.open("r", encoding="utf-8") as f:
                     cache = json.load(f) or {}
             else:
                 cache = {}

@@ -1,0 +1,9 @@
+{
+  "last_input": "[{\"store_name\":\"mof\",\"postal_code\":\"94800\",\"contact_email\":\"mohamed.ben.amor.fr@gmail.com\",\"analyze_past\":true,\"days_past\":3,\"days_future\":3,\"enable_precipitation\":true,\"wants_rain\":false,\"rain_levels\":[],\"enable_wind\":true,\"wind_type\":\"minimum\",\"wind_value\":\"10\",\"enable_temperature\":true,\"temperature_type\":\"minimum\",\"temperature_value\":\"5\",\"enable_uv\":false,\"uv_min\":\"\"}]",
+  "last_run": "2025-12-08T19:02:25",
+  "state": false,
+  "failure_counters": {
+    "khair Bouadi (94230)": 7,
+    "mof (94800)": 1
+  }
+}

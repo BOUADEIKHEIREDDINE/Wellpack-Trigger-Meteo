@@ -3,14 +3,16 @@ import re
 import json
 from datetime import datetime
 from typing import Dict, List, Tuple, Optional
+
 import pandas as pd
-from modules.weather_analyser import decision_maker_daily
-from modules.mail_sending_module import envoyer_email
+
+from app.config.settings import CACHE_FILE, CONDITIONS_FILE
+from .weather_analyser import decision_maker_daily
+from .mail_sending import envoyer_email
 
 
-# BASE_DIR pointe vers la racine du projet (un niveau au-dessus de modules/)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-CACHE_PATH = os.path.join(BASE_DIR, "data", "cache.json")
+# Alias pour compat compatibilité avec l'ancien nom
+CACHE_PATH = str(CACHE_FILE)
 
 # Configuration du mécanisme de seuil
 MAX_CONSECUTIVE_FAILURES = 7
@@ -43,8 +45,8 @@ def load_env_file(path: str) -> None:
 def load_failure_counters() -> Dict[str, int]:
     """Charge les compteurs d'échecs depuis cache.json"""
     try:
-        if os.path.exists(CACHE_PATH):
-            with open(CACHE_PATH, "r", encoding="utf-8") as f:
+        if CACHE_FILE.exists():
+            with CACHE_FILE.open("r", encoding="utf-8") as f:
                 cache = json.load(f)
                 return cache.get("failure_counters", {})
     except Exception:
@@ -56,13 +58,13 @@ def save_failure_counters(counters: Dict[str, int]) -> None:
     """Sauvegarde les compteurs d'échecs dans cache.json"""
     try:
         cache = {}
-        if os.path.exists(CACHE_PATH):
-            with open(CACHE_PATH, "r", encoding="utf-8") as f:
+        if CACHE_FILE.exists():
+            with CACHE_FILE.open("r", encoding="utf-8") as f:
                 cache = json.load(f)
         
         cache["failure_counters"] = counters
         
-        with open(CACHE_PATH, "w", encoding="utf-8") as f:
+        with CACHE_FILE.open("w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"Erreur sauvegarde compteurs: {e}")
@@ -905,7 +907,7 @@ def mark_run(cache: dict) -> None:
     try:
         cache = dict(cache or {})
         cache["last_run"] = datetime.now().isoformat(timespec="seconds")
-        with open(CACHE_PATH, "w", encoding="utf-8") as f:
+        with CACHE_FILE.open("w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
