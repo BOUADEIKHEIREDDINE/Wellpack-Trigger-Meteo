@@ -336,12 +336,15 @@ def evaluate_conditions_window(
         reference_date=reference_date.strftime("%Y-%m-%d")
     )
     
-    # 9. Vérifier si TOUTES les conditions sont OK
+    # 9. Vérifier la conformité avec tolérance (1/3 de la fenêtre, arrondi à l'inférieur)
     if df_details.empty or "conformite_globale" not in df_details.columns:
         return False, df_details
-    
-    toutes_conditions_ok = df_details["conformite_globale"].all()
-    
+
+    window_size = len(df_details)
+    tolerance = window_size // 3  # tolérance = 1/3 de la fenêtre
+    non_conformes = int((~df_details["conformite_globale"]).sum())
+    toutes_conditions_ok = non_conformes <= tolerance
+
     return toutes_conditions_ok, df_details
 
 

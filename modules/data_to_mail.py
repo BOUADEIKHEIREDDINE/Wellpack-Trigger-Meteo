@@ -474,6 +474,19 @@ def build_email_body(store_label: str, store_meta: dict, store_daily: pd.DataFra
                 f"{day_status} · {jour} ({date_str}) — Temp {temp}°C · Vent {vent} km/h · Précip {precip} mm"
             )
 
+        # Ajouter la liste des jours non conformes mais tolérés dans la fenêtre
+        non_conformes = store_daily[~store_daily.get("state", False)] if not store_daily.empty else pd.DataFrame()
+        if not non_conformes.empty:
+            lines.append("")
+            lines.append("Jours non conformes tolérés :")
+            for _, row in non_conformes.iterrows():
+                date_str = row.get("date") or "N/A"
+                jour = row.get("jour_relatif") or "-"
+                temp = format_number(row.get("temp_12h"))
+                vent = format_number(row.get("vent_12h"))
+                precip = format_number(row.get("precipitations_12h"))
+                lines.append(f" • {jour} ({date_str}) — Temp {temp}°C · Vent {vent} km/h · Précip {precip} mm")
+
     lines.extend([
         "",
         "Cordialement,",
