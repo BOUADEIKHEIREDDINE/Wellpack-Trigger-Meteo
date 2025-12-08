@@ -12,6 +12,10 @@ from modules.mail_sending_module import envoyer_email
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CACHE_PATH = os.path.join(BASE_DIR, "data", "cache.json")
 
+# Configuration du mécanisme de seuil
+MAX_CONSECUTIVE_FAILURES = 7
+FAILURE_THRESHOLD_ENABLED = True
+
 
 def load_env_file(path: str) -> None:
     """
@@ -34,6 +38,61 @@ def load_env_file(path: str) -> None:
                     os.environ[key] = value
     except Exception:
         pass
+
+
+def load_failure_counters() -> Dict[str, int]:
+    """Charge les compteurs d'échecs depuis cache.json"""
+    try:
+        if os.path.exists(CACHE_PATH):
+            with open(CACHE_PATH, "r", encoding="utf-8") as f:
+                cache = json.load(f)
+                return cache.get("failure_counters", {})
+    except Exception:
+        pass
+    return {}
+
+
+def save_failure_counters(counters: Dict[str, int]) -> None:
+    """Sauvegarde les compteurs d'échecs dans cache.json"""
+    try:
+        cache = {}
+        if os.path.exists(CACHE_PATH):
+            with open(CACHE_PATH, "r", encoding="utf-8") as f:
+                cache = json.load(f)
+        
+        cache["failure_counters"] = counters
+        
+        with open(CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(cache, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"Erreur sauvegarde compteurs: {e}")
+
+
+def update_failure_counter(store_label: str, success: bool) -> Tuple[int, bool]:
+    """
+    Met à jour le compteur d'échecs.
+    Returns: (compteur_actuel, doit_notifier)
+    """
+    if not FAILURE_THRESHOLD_ENABLED:
+        return 0, True
+    
+    counters = load_failure_counters()
+    
+    if success:
+        # Succès : réinitialiser
+        if store_label in counters:
+            del counters[store_label]
+        save_failure_counters(counters)
+        return 0, True
+    else:
+        # Échec : incrémenter
+        current_count = counters.get(store_label, 0) + 1
+        counters[store_label] = current_count
+        save_failure_counters(counters)
+        
+        # Vérifier le seuil
+        should_notify = current_count < MAX_CONSECUTIVE_FAILURES
+        return current_count, should_notify
 
 
 def sanitize_store_name(name: str) -> str:
@@ -513,19 +572,44 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
 
     reports: Dict[str, dict] = {}
 
-    # Si aucune filiale ne déclenche d'alerte, ne rien envoyer
-    if not decisions:
-        for store_label in stores_meta.keys():
-            reports[store_label] = {
-                "sent": False,
-                "message": "Conditions météo non respectées sur toute la période."
-            }
+    # Traiter chaque filiale avec la logique de seuil
+    for store_label in stores_meta.keys():
+        alert_triggered = store_label in decisions
+        failure_count, should_notify = update_failure_counter(store_label, alert_triggered)
+        
+        if not alert_triggered:
+            if not should_notify:
+                # Seuil atteint : ne plus notifier
+                reports[store_label] = {
+                    "sent": False,
+                    "message": f"Notifications désactivées après {failure_count} échecs consécutifs.",
+                    "silenced": True,
+                    "failure_count": failure_count
+                }
+                print(f"🔇 {store_label}: seuil atteint ({failure_count}/{MAX_CONSECUTIVE_FAILURES})")
+                continue
+            else:
+                # Échec mais en dessous du seuil
+                reports[store_label] = {
+                    "sent": False,
+                    "message": f"Conditions non respectées ({failure_count}/{MAX_CONSECUTIVE_FAILURES}).",
+                    "silenced": False,
+                    "failure_count": failure_count
+                }
+                continue
+    
+    # Si aucune filiale ne déclenche d'alerte (après filtrage par seuil), ne rien envoyer
+    active_decisions = {k: v for k, v in decisions.items() if k in stores_meta and not reports.get(k, {}).get("silenced", False)}
+    
+    if not active_decisions:
+        # Toutes les filiales sont soit non conformes, soit en sourdine
         smtp_context = {
             "configured": smtp_configured,
             "sender": smtp_email,
             "server": smtp_server,
             "port": smtp_port,
         }
+        # Les reports ont déjà été remplis dans la boucle ci-dessus
         return reports, smtp_context
 
     # Trouver un email global : premier email de contact non vide
@@ -565,7 +649,8 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
         return reports, smtp_context
 
     # Construire un email unique avec un format simplifié
-    conforming_labels = [lbl for lbl in stores_meta.keys() if lbl in decisions]
+    # Ne garder que les filiales conformes ET non en sourdine
+    conforming_labels = [lbl for lbl in stores_meta.keys() if lbl in active_decisions]
 
     lines: List[str] = [
         "Bonjour,",
@@ -660,15 +745,36 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
         port_smtp=smtp_port,
     )
 
+    # Mettre à jour les reports pour les filiales conformes qui ont reçu l'email
+    for store_label in conforming_labels:
+        if store_label not in reports:
+            reports[store_label] = {
+                "sent": bool(success),
+                "message": (
+                    f"Synthèse globale envoyée à {global_recipient}."
+                    if success else
+                    "Erreur lors de l'envoi de l'email de synthèse."
+                ),
+                "silenced": False,
+                "failure_count": 0
+            }
+        else:
+            # Mettre à jour le statut d'envoi pour les filiales conformes
+            reports[store_label]["sent"] = bool(success)
+            if success:
+                reports[store_label]["message"] = f"Synthèse globale envoyée à {global_recipient}."
+    
+    # S'assurer que toutes les filiales ont un rapport (au cas où)
     for store_label in stores_meta.keys():
-        reports[store_label] = {
-            "sent": bool(success),
-            "message": (
-                f"Synthèse globale envoyée à {global_recipient}."
-                if success else
-                "Erreur lors de l'envoi de l'email de synthèse."
-            ),
-        }
+        if store_label not in reports:
+            counters = load_failure_counters()
+            failure_count = counters.get(store_label, 0)
+            reports[store_label] = {
+                "sent": False,
+                "message": "Aucune notification envoyée.",
+                "silenced": False,
+                "failure_count": failure_count
+            }
 
     smtp_context = {
         "configured": smtp_configured,
@@ -704,6 +810,18 @@ def build_results_payload(
 
         alert_triggered = store_label in decisions
         email_status = email_reports.get(store_label, {"sent": False, "message": "Aucune notification envoyée."})
+        
+        # Ajouter failure_info pour toutes les filiales (même celles qui n'ont pas encore de compteur)
+        if "failure_count" not in email_status:
+            counters = load_failure_counters()
+            failure_count = counters.get(store_label, 0)
+            email_status["failure_count"] = failure_count
+        
+        # Ajouter failure_info pour l'affichage de la barre de progression
+        if not alert_triggered and not email_status.get("silenced", False):
+            email_status["failure_info"] = {
+                "count": email_status.get("failure_count", 0)
+            }
 
         results.append({
             "label": store_label,
@@ -764,11 +882,13 @@ def execute_analysis(entries_raw: str) -> Tuple[dict, List[dict], List[str], dic
     total_points = len(stores_results)
     triggered_points = sum(1 for store in stores_results if store["alert_triggered"])
     emails_sent = sum(1 for store in stores_results if store["email_status"].get("sent"))
+    silenced_count = sum(1 for store in stores_results if store["email_status"].get("silenced", False))
 
     summary = {
         "total": total_points,
         "alerts": triggered_points,
         "emails_sent": emails_sent,
+        "silenced_count": silenced_count,
         "generated_at": datetime.now().strftime("%d/%m/%Y %H:%M"),
         "smtp_configured": smtp_context.get("configured", False),
         "sender": smtp_context.get("sender"),

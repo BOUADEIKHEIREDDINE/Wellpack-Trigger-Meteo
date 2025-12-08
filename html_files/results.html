@@ -170,6 +170,54 @@
       border: 1px solid rgba(239,68,68,0.35);
     }
 
+    .status-warning {
+      background: rgba(245,158,11,0.18);
+      color: #f59e0b;
+      border: 1px solid rgba(245,158,11,0.35);
+    }
+
+    .status-silenced {
+      background: rgba(107,114,128,0.18);
+      color: #6b7280;
+      border: 1px solid rgba(107,114,128,0.35);
+    }
+
+    .store-card.silenced {
+      opacity: 0.7;
+      border: 2px solid var(--accent);
+    }
+
+    .failure-progress {
+      margin: 16px 0;
+      padding: 14px;
+      background: rgba(245,158,11,0.1);
+      border-radius: 12px;
+      border: 1px solid rgba(245,158,11,0.25);
+    }
+
+    .failure-progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+      color: #f59e0b;
+      margin-bottom: 8px;
+    }
+
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: rgba(255,255,255,0.5);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #f59e0b, #dc2626);
+      border-radius: 999px;
+    }
+
     .conditions-chips {
       display: flex;
       flex-wrap: wrap;
@@ -295,12 +343,30 @@
           <div class="detail">Expéditeur : {{ summary.sender }}</div>
         {% endif %}
       </div>
+      {% if summary.silenced_count > 0 %}
+      <div class="summary-card">
+        <h3>🔇 Notifications désactivées</h3>
+        <div class="value" style="color: #f59e0b;">{{ summary.silenced_count }}</div>
+        <div class="detail">Seuil d'échecs atteint (conditions irréalistes)</div>
+      </div>
+      {% endif %}
     </section>
 
     {% if not summary.smtp_configured %}
       <div class="alert">
         <strong>⚠️ Notifications non envoyées :</strong>
-        <span>Renseignez les variables d’environnement <code>SMTP_EMAIL</code> et <code>SMTP_PASSWORD</code> pour activer l’envoi d’emails.</span>
+        <span>Renseignez les variables d'environnement <code>SMTP_EMAIL</code> et <code>SMTP_PASSWORD</code> pour activer l'envoi d'emails.</span>
+      </div>
+    {% endif %}
+
+    {% if summary.silenced_count > 0 %}
+      <div class="alert">
+        <strong>🔇 Mécanisme de seuil actif :</strong>
+        <span>
+          {{ summary.silenced_count }} point(s) de vente en sourdine 
+          (conditions non remplies pendant 7 jours consécutifs). 
+          Vérifiez que vos seuils météo sont réalistes.
+        </span>
       </div>
     {% endif %}
 
@@ -317,18 +383,61 @@
 
     <section class="stores-grid">
       {% for store in stores %}
-        <article class="store-card">
+        <article class="store-card {% if store.email_status.get('silenced') %}silenced{% endif %}" data-store-label="{{ store.label }}">
           <div class="store-header">
             <h2 class="store-title">{{ store.label }}</h2>
             <span class="store-meta">Email : {{ store.email }} · Code postal : {{ store.postal_code }}</span>
             <span class="window-chip">Fenêtre : J-{{ store.window.avant }} à J+{{ store.window.apres }}</span>
-            <span class="status-chip {% if store.alert_triggered %}status-success{% else %}status-error{% endif %}">
-              {% if store.alert_triggered %}✔ Alerte déclenchée{% else %}✖ Conditions non réunies{% endif %}
+            <span id="status-chip-{{ store.label|replace(' ', '-')|lower }}" class="status-chip {% if store.email_status.get('silenced') %}status-silenced{% elif store.alert_triggered %}status-success{% else %}status-error{% endif %}">
+              {% if store.email_status.get('silenced') %}
+                🔇 Notifications désactivées ({{ store.email_status.get('failure_count', 0) }} échecs)
+              {% elif store.alert_triggered %}
+                ✓ Alerte déclenchée
+              {% else %}
+                ✗ Conditions non réunies
+              {% endif %}
             </span>
             <span class="status-chip {% if store.email_status.sent %}status-success{% else %}status-error{% endif %}">
               {% if store.email_status.sent %}📨 Email envoyé{% else %}📨 {{ store.email_status.message }}{% endif %}
             </span>
           </div>
+
+          {% if not store.alert_triggered and not store.email_status.get('silenced') %}
+            {% set failure_info = store.email_status.get('failure_info', {}) %}
+            {% if failure_info.get('count', 0) > 0 %}
+              <div class="failure-progress" id="failure-progress-{{ store.label|replace(' ', '-')|lower }}" data-store-label="{{ store.label }}">
+                <div class="failure-progress-label">
+                  <span>⚠ Échecs consécutifs</span>
+                  <span id="failure-count-{{ store.label|replace(' ', '-')|lower }}">{{ failure_info.get('count', 0) }} / 7</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill" id="progress-fill-{{ store.label|replace(' ', '-')|lower }}"
+                       style="width: {{ (failure_info.get('count', 0) / 7 * 100)|round }}%;"></div>
+                </div>
+                <div style="margin-top: 8px; font-size: 12px; color: #6b7280;" id="failure-message-{{ store.label|replace(' ', '-')|lower }}">
+                  {% set remaining = 7 - failure_info.get('count', 0) %}
+                  {% if remaining <= 2 %}
+                    <strong style="color: var(--error);">⚠ Plus que {{ remaining }} échec(s) avant désactivation !</strong>
+                  {% else %}
+                    Plus que {{ remaining }} échec(s) avant désactivation automatique.
+                  {% endif %}
+                </div>
+              </div>
+            {% else %}
+              <div class="failure-progress" id="failure-progress-{{ store.label|replace(' ', '-')|lower }}" data-store-label="{{ store.label }}" style="display: none;">
+                <div class="failure-progress-label">
+                  <span>⚠ Échecs consécutifs</span>
+                  <span id="failure-count-{{ store.label|replace(' ', '-')|lower }}">0 / 7</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill" id="progress-fill-{{ store.label|replace(' ', '-')|lower }}" style="width: 0%;"></div>
+                </div>
+                <div style="margin-top: 8px; font-size: 12px; color: #6b7280;" id="failure-message-{{ store.label|replace(' ', '-')|lower }}">
+                  Plus que 7 échec(s) avant désactivation automatique.
+                </div>
+              </div>
+            {% endif %}
+          {% endif %}
 
           <div class="conditions-chips">
             {% for condition in store.conditions %}
@@ -380,6 +489,196 @@
       <a href="{{ url_for('index') }}">← Ajouter de nouveaux points de vente</a>
     </div>
   </main>
+
+  <script>
+    // Mise à jour en temps réel des compteurs d'échecs
+    (function() {
+      const POLL_INTERVAL = 2000; // 2 secondes
+      let pollIntervalId = null;
+
+      function sanitizeId(str) {
+        return str.replace(/\s+/g, '-').toLowerCase();
+      }
+
+      function updateFailureCounters() {
+        fetch('/api/failure-counters')
+          .then(response => response.json())
+          .then(data => {
+            if (data.success && data.counters) {
+              const counters = data.counters;
+              
+              // Mettre à jour chaque filiale
+              document.querySelectorAll('.store-card[data-store-label]').forEach(storeCard => {
+                const storeLabel = storeCard.getAttribute('data-store-label');
+                const storeId = sanitizeId(storeLabel);
+                const failureCount = counters[storeLabel] || 0;
+                
+                // Mettre à jour le compteur dans le bandeau
+                const countElement = document.getElementById(`failure-count-${storeId}`);
+                const progressFill = document.getElementById(`progress-fill-${storeId}`);
+                const progressContainer = document.getElementById(`failure-progress-${storeId}`);
+                const messageElement = document.getElementById(`failure-message-${storeId}`);
+                const statusChip = document.getElementById(`status-chip-${storeId}`);
+                
+                // Si le bandeau n'existe pas encore, le créer pour les filiales non conformes
+                if (!progressContainer && failureCount > 0 && !storeCard.classList.contains('silenced')) {
+                  // Vérifier si la filiale est non conforme (pas d'alerte déclenchée)
+                  const hasAlertTriggered = statusChip && statusChip.classList.contains('status-success');
+                  if (!hasAlertTriggered) {
+                    // Créer le bandeau dynamiquement
+                    const failureProgressDiv = document.createElement('div');
+                    failureProgressDiv.className = 'failure-progress';
+                    failureProgressDiv.id = `failure-progress-${storeId}`;
+                    failureProgressDiv.setAttribute('data-store-label', storeLabel);
+                    
+                    failureProgressDiv.innerHTML = `
+                      <div class="failure-progress-label">
+                        <span>⚠ Échecs consécutifs</span>
+                        <span id="failure-count-${storeId}">${failureCount} / 7</span>
+                      </div>
+                      <div class="progress-bar">
+                        <div class="progress-fill" id="progress-fill-${storeId}" style="width: ${Math.round((failureCount / 7) * 100)}%;"></div>
+                      </div>
+                      <div style="margin-top: 8px; font-size: 12px; color: #6b7280;" id="failure-message-${storeId}">
+                        ${failureCount >= 6 ? `<strong style="color: var(--error);">⚠ Plus que ${7 - failureCount} échec(s) avant désactivation !</strong>` : `Plus que ${7 - failureCount} échec(s) avant désactivation automatique.`}
+                      </div>
+                    `;
+                    
+                    // Insérer après le store-header
+                    const storeHeader = storeCard.querySelector('.store-header');
+                    if (storeHeader && storeHeader.nextSibling) {
+                      storeHeader.parentNode.insertBefore(failureProgressDiv, storeHeader.nextSibling);
+                    } else if (storeHeader) {
+                      storeHeader.parentNode.appendChild(failureProgressDiv);
+                    }
+                    
+                    // Référencer les nouveaux éléments créés pour la suite du traitement
+                    const newProgressContainer = document.getElementById(`failure-progress-${storeId}`);
+                    const newCountElement = document.getElementById(`failure-count-${storeId}`);
+                    const newProgressFill = document.getElementById(`progress-fill-${storeId}`);
+                    const newMessageElement = document.getElementById(`failure-message-${storeId}`);
+                    
+                    // Continuer avec la mise à jour normale en utilisant les nouveaux éléments
+                    if (newCountElement) newCountElement.textContent = `${failureCount} / 7`;
+                    if (newProgressFill) newProgressFill.style.width = `${Math.round((failureCount / 7) * 100)}%`;
+                    if (newMessageElement) {
+                      const remaining = 7 - failureCount;
+                      if (remaining <= 2) {
+                        newMessageElement.innerHTML = `<strong style="color: var(--error);">⚠ Plus que ${remaining} échec(s) avant désactivation !</strong>`;
+                      } else {
+                        newMessageElement.textContent = `Plus que ${remaining} échec(s) avant désactivation automatique.`;
+                      }
+                    }
+                    
+                    // Mettre à jour les références pour continuer le traitement
+                    if (newProgressContainer) progressContainer = newProgressContainer;
+                    if (newCountElement) countElement = newCountElement;
+                    if (newProgressFill) progressFill = newProgressFill;
+                    if (newMessageElement) messageElement = newMessageElement;
+                  }
+                }
+                
+                if (failureCount > 0) {
+                  // Afficher le bandeau s'il est caché
+                  if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                  }
+                  
+                  // Mettre à jour le compteur
+                  if (countElement) {
+                    countElement.textContent = `${failureCount} / 7`;
+                  }
+                  
+                  // Mettre à jour la barre de progression
+                  if (progressFill) {
+                    const percentage = Math.round((failureCount / 7) * 100);
+                    progressFill.style.width = `${percentage}%`;
+                  }
+                  
+                  // Mettre à jour le message
+                  if (messageElement) {
+                    const remaining = 7 - failureCount;
+                    if (remaining <= 2) {
+                      messageElement.innerHTML = `<strong style="color: var(--error);">⚠ Plus que ${remaining} échec(s) avant désactivation !</strong>`;
+                    } else {
+                      messageElement.textContent = `Plus que ${remaining} échec(s) avant désactivation automatique.`;
+                    }
+                  }
+                  
+                  // Vérifier si le seuil est atteint
+                  if (failureCount >= 7 && statusChip) {
+                    statusChip.className = 'status-chip status-silenced';
+                    statusChip.textContent = `🔇 Notifications désactivées (${failureCount} échecs)`;
+                    
+                    // Masquer le bandeau de progression
+                    if (progressContainer) {
+                      progressContainer.style.display = 'none';
+                    }
+                    
+                    // Ajouter la classe silenced à la carte
+                    const storeCard = statusChip.closest('.store-card');
+                    if (storeCard) {
+                      storeCard.classList.add('silenced');
+                    }
+                  }
+                } else {
+                  // Masquer le bandeau si le compteur est à 0
+                  if (progressContainer) {
+                    progressContainer.style.display = 'none';
+                  }
+                  
+                  // Réinitialiser le statut si nécessaire
+                  if (statusChip && statusChip.classList.contains('status-silenced')) {
+                    const storeCard = statusChip.closest('.store-card');
+                    const alertTriggered = storeCard && storeCard.querySelector('.status-success');
+                    
+                    if (alertTriggered) {
+                      statusChip.className = 'status-chip status-success';
+                      statusChip.textContent = '✓ Alerte déclenchée';
+                    } else {
+                      statusChip.className = 'status-chip status-error';
+                      statusChip.textContent = '✗ Conditions non réunies';
+                    }
+                    
+                    if (storeCard) {
+                      storeCard.classList.remove('silenced');
+                    }
+                  }
+                }
+              });
+            }
+          })
+          .catch(error => {
+            console.error('Erreur lors de la mise à jour des compteurs:', error);
+          });
+      }
+
+      // Démarrer le polling
+      function startPolling() {
+        if (pollIntervalId) {
+          clearInterval(pollIntervalId);
+        }
+        pollIntervalId = setInterval(updateFailureCounters, POLL_INTERVAL);
+        // Mise à jour immédiate
+        updateFailureCounters();
+      }
+
+      // Arrêter le polling quand la page est cachée (optimisation)
+      document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+          if (pollIntervalId) {
+            clearInterval(pollIntervalId);
+            pollIntervalId = null;
+          }
+        } else {
+          startPolling();
+        }
+      });
+
+      // Démarrer au chargement de la page
+      startPolling();
+    })();
+  </script>
 </body>
 </html>
 

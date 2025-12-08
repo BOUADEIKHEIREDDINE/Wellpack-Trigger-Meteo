@@ -16,6 +16,7 @@ from modules.data_to_mail import (
     execute_analysis,
     mark_run,
     build_entries_from_excel,
+    load_failure_counters,
 )
 
 # Charger les variables d'environnement depuis .env
@@ -144,6 +145,16 @@ def export_excel():
         )
 
     return render_template("export_excel.html")
+
+
+@app.route("/api/failure-counters", methods=["GET"])
+def api_failure_counters():
+    """API endpoint pour récupérer les compteurs d'échecs en temps réel"""
+    try:
+        counters = load_failure_counters()
+        return jsonify({"success": True, "counters": counters})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 if __name__ == "__main__":
