@@ -66,11 +66,11 @@ def envoyer_email(
         texte = message.as_string()
         serveur.sendmail(expediteur_email, destinataire_email, texte)
         
-        print(f"✓ Email envoyé avec succès à {destinataire_email}")
+        print(f"[OK] Email envoye avec succes a {destinataire_email}")
         return True
         
     except Exception as e:
-        print(f"✗ Erreur lors de l'envoi de l'email: {e}")
+        print(f"[ERROR] Erreur lors de l'envoi de l'email: {e}")
         return False
     finally:
         if serveur is not None:

@@ -528,7 +528,7 @@ def display_weather_check_summary(result: bool, df: pd.DataFrame) -> None:
     print("-"*80)
     
     if df.empty:
-        print("⚠️ Aucune donnée disponible")
+        print("[WARNING] Aucune donnee disponible")
         return
     
     # Afficher le DataFrame avec mise en forme
@@ -597,7 +597,7 @@ if __name__ == "__main__":
     if not df_details.empty and "conformite_globale" in df_details.columns:
         jours_non_conformes = df_details[~df_details["conformite_globale"]]
         if not jours_non_conformes.empty:
-            print(f"\n⚠️ Jours NON conformes:")
+            print(f"\n[WARNING] Jours NON conformes:")
             print(jours_non_conformes[["date", "jour_relatif", "temp_ok", "precip_ok", "vent_ok", "uv_ok"]])    
 
 def load_user_csv(csv_path: str) -> pd.DataFrame:
@@ -859,7 +859,7 @@ def decision_maker_daily(DB: pd.DataFrame, target_date: str = None) -> Tuple[dic
                 "state": False,
                 "erreur": str(e)
             })
-            print(f"⚠️ Erreur pour {magasin} (CP: {code_postal}): {e}")
+            print(f"[WARNING] Erreur pour {magasin} (CP: {code_postal}): {e}")
     
     # Créer le DataFrame avec format jour par jour
     df_daily = pd.DataFrame(daily_records)
@@ -892,7 +892,7 @@ def display_daily_results(decisions: dict, df_daily: pd.DataFrame) -> None:
     print("-"*120 + "\n")
     
     if df_daily.empty:
-        print("⚠️ Aucun résultat disponible")
+        print("[WARNING] Aucun resultat disponible")
         return
     
     # Configurer pandas pour affichage propre
@@ -1019,7 +1019,7 @@ def fetch_historical_weather(
         hourly_data = data.get("hourly")
         
         if not hourly_data:
-            print(f"⚠️  Aucune donnée historique disponible pour {start_date} à {end_date}")
+            print(f"[WARNING] Aucune donnee historique disponible pour {start_date} a {end_date}")
             return None
         
         return hourly_data

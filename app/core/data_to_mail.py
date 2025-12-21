@@ -19,15 +19,55 @@ MAX_CONSECUTIVE_FAILURES = 7
 FAILURE_THRESHOLD_ENABLED = True
 
 
+def validate_smtp_config() -> Tuple[Optional[str], Optional[str], str, int]:
+    """
+    Valide et récupère la configuration SMTP depuis les variables d'environnement.
+    
+    Returns:
+        Tuple (smtp_email, smtp_password, smtp_server, smtp_port)
+    
+    Raises:
+        ValueError: Si les variables SMTP_EMAIL ou SMTP_PASSWORD sont manquantes
+    """
+    smtp_email = os.getenv("SMTP_EMAIL")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port_raw = os.getenv("SMTP_PORT", "587")
+    
+    # Vérifier les variables critiques (sans logger leurs valeurs)
+    if not smtp_email:
+        raise ValueError(
+            "Variable d'environnement SMTP_EMAIL manquante.\n"
+            "En local: créez un fichier .env à la racine avec SMTP_EMAIL=votre_email@gmail.com\n"
+            "En production: définissez-la via GitHub Secrets"
+        )
+    if not smtp_password:
+        raise ValueError(
+            "Variable d'environnement SMTP_PASSWORD manquante.\n"
+            "En local: créez un fichier .env à la racine avec SMTP_PASSWORD=votre_mot_de_passe\n"
+            "En production: définissez-la via GitHub Secrets"
+        )
+    
+    try:
+        smtp_port = int(smtp_port_raw)
+    except (TypeError, ValueError):
+        smtp_port = 587
+    
+    return smtp_email, smtp_password, smtp_server, smtp_port
+
+
 def load_env_file(path: str) -> None:
     """
-    Charge un fichier .env (clé=valeur) pour garantir la présence des
-    identifiants SMTP lorsque l'application est lancée manuellement ou
-    par un planificateur externe.
+    Charge un fichier .env (clé=valeur) UNIQUEMENT pour le développement local.
+    En production, utilisez les variables d'environnement directement.
+    Cette fonction ne doit être appelée qu'en développement.
     """
+    # Ne charger .env que si explicitement demandé (dev local uniquement)
+    # En production, les variables d'environnement doivent être définies directement
     if not os.path.isfile(path):
         return
     try:
+        loaded_count = 0
         with open(path, "r", encoding="utf-8") as env_file:
             for raw_line in env_file:
                 line = raw_line.strip()
@@ -36,10 +76,14 @@ def load_env_file(path: str) -> None:
                 key, value = line.split("=", 1)
                 key = key.strip()
                 value = value.strip().strip('"').strip("'")
+                # Ne charger que si la variable n'existe pas déjà dans l'environnement
                 if key and value and key not in os.environ:
                     os.environ[key] = value
-    except Exception:
-        pass
+                    loaded_count += 1
+        if loaded_count > 0:
+            print(f"[INFO] {loaded_count} variable(s) chargee(s) depuis .env")
+    except Exception as e:
+        print(f"[WARNING] Erreur lors du chargement du fichier .env: {e}")
 
 
 def load_failure_counters() -> Dict[str, int]:
@@ -561,16 +605,23 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
     Envoie désormais UN SEUL email global pour toutes les filiales concernées.
     L'email est adressé au premier email de contact trouvé dans stores_meta.
     """
-    smtp_email = os.environ.get("SMTP_EMAIL")
-    smtp_password = os.environ.get("SMTP_PASSWORD")
-    smtp_server = os.environ.get("SMTP_SERVER", "smtp.gmail.com")
-    smtp_port_raw = os.environ.get("SMTP_PORT", "587")
+    # Récupérer et valider la configuration SMTP depuis les variables d'environnement
     try:
-        smtp_port = int(smtp_port_raw)
-    except (TypeError, ValueError):
-        smtp_port = 587
-
-    smtp_configured = bool(smtp_email and smtp_password)
+        smtp_email, smtp_password, smtp_server, smtp_port = validate_smtp_config()
+        smtp_configured = True
+    except ValueError as e:
+        # Configuration SMTP manquante - continuer sans envoyer d'emails
+        smtp_configured = False
+        smtp_email = None
+        smtp_password = None
+        smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+        smtp_port_raw = os.getenv("SMTP_PORT", "587")
+        try:
+            smtp_port = int(smtp_port_raw)
+        except (TypeError, ValueError):
+            smtp_port = 587
+        # Ne pas logger le message d'erreur complet pour éviter d'exposer des informations sensibles
+        print("[WARNING] Configuration SMTP incomplète. Les emails ne seront pas envoyés.")
 
     reports: Dict[str, dict] = {}
 
@@ -588,7 +639,7 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
                     "silenced": True,
                     "failure_count": failure_count
                 }
-                print(f"🔇 {store_label}: seuil atteint ({failure_count}/{MAX_CONSECUTIVE_FAILURES})")
+                print(f"[SILENCED] {store_label}: seuil atteint ({failure_count}/{MAX_CONSECUTIVE_FAILURES})")
                 continue
             else:
                 # Échec mais en dessous du seuil

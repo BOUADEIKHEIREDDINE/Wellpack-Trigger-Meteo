@@ -4,7 +4,7 @@ import threading
 import time
 import webbrowser
 
-from app.config.settings import BASE_DIR, CACHE_FILE, CONDITIONS_FILE, ENV_FILE, TEMPLATES_DIR
+from app.config.settings import BASE_DIR, CACHE_FILE, CONDITIONS_FILE, TEMPLATES_DIR
 from app.core.data_to_mail import (
     load_env_file,
     execute_analysis,
@@ -13,9 +13,12 @@ from app.core.data_to_mail import (
     load_failure_counters,
 )
 
-# Charger les variables d'environnement depuis .env
-if ENV_FILE.exists():
-    load_env_file(str(ENV_FILE))
+# Charger .env pour le développement local (si le fichier existe)
+# En production (GitHub Actions), les variables d'environnement sont injectées directement
+# et ce fichier .env n'existe pas, donc rien n'est chargé
+env_file_path = BASE_DIR / ".env"
+if env_file_path.exists():
+    load_env_file(str(env_file_path))
 
 # Les templates sont situés dans frontend/templates
 app = Flask(__name__, template_folder=str(TEMPLATES_DIR))
