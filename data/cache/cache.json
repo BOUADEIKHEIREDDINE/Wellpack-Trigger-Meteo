@@ -1,9 +1,10 @@
 {
-  "last_input": "[{\"store_name\":\"Decathlon\",\"postal_code\":\"94230\",\"contact_email\":\"khairkhair012@gmail.com\",\"analyze_past\":false,\"days_past\":0,\"days_future\":0,\"enable_precipitation\":false,\"wants_rain\":false,\"rain_levels\":[],\"enable_wind\":true,\"wind_type\":\"minimum\",\"wind_value\":\"0\",\"enable_temperature\":true,\"temperature_type\":\"minimum\",\"temperature_value\":\"0\",\"enable_uv\":false,\"uv_min\":\"\"}]",
-  "last_run": "2025-12-21T20:10:19",
+  "last_input": "[{\"store_name\":\"Bouadi Kheireddine\",\"postal_code\":\"94230\",\"contact_email\":\"kheireddine.bouadi@aivancity.education\",\"analyze_past\":false,\"days_past\":0,\"days_future\":0,\"enable_precipitation\":false,\"wants_rain\":false,\"rain_levels\":[],\"enable_wind\":true,\"wind_type\":\"minimum\",\"wind_value\":\"0\",\"enable_temperature\":true,\"temperature_type\":\"minimum\",\"temperature_value\":\"0\",\"enable_uv\":false,\"uv_min\":\"\"}]",
+  "last_run": "2025-12-22T13:36:23",
   "state": true,
   "failure_counters": {
     "khair Bouadi (94230)": 7,
-    "mof (94800)": 1
+    "mof (94800)": 1,
+    "Decathlon (94230)": 7
   }
 }

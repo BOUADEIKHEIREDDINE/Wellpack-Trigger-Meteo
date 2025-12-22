@@ -8,12 +8,7 @@ from app.config.settings import CACHE_FILE
 from app.core.data_to_mail import execute_analysis, mark_run, transform_entries
 from app.core.weather_analyser import decision_maker_daily
 
-
 def evaluate_conditions(entries_raw: str) -> Tuple[bool, List[str]]:
-    """
-    Retourne (conditions_ok, issues) sans déclencher d'envoi d'e-mails.
-    conditions_ok est True si au moins un magasin déclencherait une alerte.
-    """
     try:
         entries = json.loads(entries_raw or "[]")
     except json.JSONDecodeError as exc:
@@ -33,18 +28,15 @@ def evaluate_conditions(entries_raw: str) -> Tuple[bool, List[str]]:
 
     return bool(decisions), issues
 
-
 def should_send_mail(previous_state: bool, conditions_ok: bool, first_run: bool) -> bool:
     if first_run:
-        # Considérer state=False par défaut puis appliquer les règles classiques.
         return conditions_ok
 
     if conditions_ok and not previous_state:
-        return True  # conditions rétablies
+        return True
     if not conditions_ok and previous_state:
-        return True  # conditions ne sont plus respectées
+        return True
     return False
-
 
 def main():
     if not CACHE_FILE.exists():
@@ -93,8 +85,7 @@ def main():
         print("No state change detected. Skipping email dispatch.")
 
     cache["state"] = conditions_ok
-    mark_run(cache)  # Mark the run to update 'last_run' timestamp (and state) in cache.json
-
+    mark_run(cache)
 
 if __name__ == "__main__":
     main()

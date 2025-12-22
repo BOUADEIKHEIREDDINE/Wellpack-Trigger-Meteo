@@ -13,21 +13,15 @@ from app.core.data_to_mail import (
     load_failure_counters,
 )
 
-# Charger .env pour le développement local (si le fichier existe)
-# En production (GitHub Actions), les variables d'environnement sont injectées directement
-# et ce fichier .env n'existe pas, donc rien n'est chargé
 env_file_path = BASE_DIR / ".env"
 if env_file_path.exists():
     load_env_file(str(env_file_path))
 
-# Les templates sont situés dans frontend/templates
 app = Flask(__name__, template_folder=str(TEMPLATES_DIR))
-
 
 @app.route("/", methods=["GET"]) 
 def index():
     return render_template("index.html")
-
 
 @app.route("/submit", methods=["POST"]) 
 def submit():
@@ -67,24 +61,19 @@ def submit():
         smtp=smtp_context,
     )
 
-
 @app.route("/cron", methods=["POST", "GET"])
 def cron():
     return jsonify({"ok": False, "reason": "deprecated_endpoint"}), 404
 
-
 @app.route("/download-excel-template", methods=["GET"])
 def download_excel_template():
-    """Télécharge le fichier Excel Conditions.xlsx"""
     excel_path = CONDITIONS_FILE
     if excel_path.exists():
         return send_file(str(excel_path), as_attachment=True, download_name="Conditions.xlsx")
     return jsonify({"error": "Fichier Excel non trouvé"}), 404
 
-
 @app.route("/export-excel", methods=["GET", "POST"])
 def export_excel():
-    """Page d'export/import du fichier Excel rempli"""
     if request.method == "POST":
         excel_file = request.files.get("excel_file")
         if not excel_file or excel_file.filename == "":
@@ -107,7 +96,6 @@ def export_excel():
         entries_payload = json.dumps(entries, ensure_ascii=False)
         summary, stores_results, issues, smtp_context = execute_analysis(entries_payload)
 
-        # Mettre à jour le cache comme pour le formulaire classique
         try:
             if CACHE_FILE.exists():
                 with CACHE_FILE.open("r", encoding="utf-8") as f:
@@ -142,19 +130,15 @@ def export_excel():
 
     return render_template("export_excel.html")
 
-
 @app.route("/api/failure-counters", methods=["GET"])
 def api_failure_counters():
-    """API endpoint pour récupérer les compteurs d'échecs en temps réel"""
     try:
         counters = load_failure_counters()
         return jsonify({"success": True, "counters": counters})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-
 if __name__ == "__main__":
-    # Ouvre automatiquement le navigateur en HTTP simple
     def open_browser():
         time.sleep(1)
         webbrowser.open_new("http://127.0.0.1:5000")
