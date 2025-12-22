@@ -50,7 +50,7 @@ def load_env_file(path: str) -> None:
         with open(path, "r", encoding="utf-8") as env_file:
             for raw_line in env_file:
                 line = raw_line.strip()
-                if not line or line.startswith("
+                if not line or line.startswith("#") or "=" not in line:
                     continue
                 key, value = line.split("=", 1)
                 key = key.strip()
@@ -79,9 +79,9 @@ def save_failure_counters(counters: Dict[str, int]) -> None:
         if CACHE_FILE.exists():
             with CACHE_FILE.open("r", encoding="utf-8") as f:
                 cache = json.load(f)
-
+        
         cache["failure_counters"] = counters
-
+        
         with CACHE_FILE.open("w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
     except Exception as e:
@@ -90,9 +90,9 @@ def save_failure_counters(counters: Dict[str, int]) -> None:
 def update_failure_counter(store_label: str, success: bool) -> Tuple[int, bool]:
     if not FAILURE_THRESHOLD_ENABLED:
         return 0, True
-
+    
     counters = load_failure_counters()
-
+    
     if success:
         if store_label in counters:
             del counters[store_label]
@@ -102,7 +102,7 @@ def update_failure_counter(store_label: str, success: bool) -> Tuple[int, bool]:
         current_count = counters.get(store_label, 0) + 1
         counters[store_label] = current_count
         save_failure_counters(counters)
-
+        
         should_notify = current_count < MAX_CONSECUTIVE_FAILURES
         return current_count, should_notify
 
@@ -274,77 +274,77 @@ def build_conditions(entry: dict, temp_value: float, precip_value: Optional[floa
     conditions["_enable_uv"] = enable_uv
 
     if enable_temperature:
-        temp_type = entry.get("temperature_type", "minimum")
-        if temp_type == "minimum":
-            conditions["temp_min"] = temp_value
-            display["temp_min"] = temp_value
-        else:
-            conditions["temp_max"] = temp_value
-            display["temp_max"] = temp_value
+    temp_type = entry.get("temperature_type", "minimum")
+    if temp_type == "minimum":
+        conditions["temp_min"] = temp_value
+        display["temp_min"] = temp_value
+    else:
+        conditions["temp_max"] = temp_value
+        display["temp_max"] = temp_value
 
     if enable_precipitation:
-        wants_rain = entry.get("wants_rain", False)
-        rain_levels = entry.get("rain_levels", [])
-
-        if isinstance(rain_levels, str):
-            rain_levels = [rain_levels] if rain_levels else []
-
-        if wants_rain and rain_levels:
-            min_precip = None
-            max_precip = None
-
-            if "weak" in rain_levels:
-                min_precip = 1.0 if min_precip is None else min(min_precip, 1.0)
-                max_precip = 3.0 if max_precip is None else max(max_precip, 3.0)
-
-            if "moderate" in rain_levels:
-                min_precip = 4.0 if min_precip is None else min(min_precip, 4.0)
-                max_precip = 7.0 if max_precip is None else max(max_precip, 7.0)
-
-            if "strong" in rain_levels:
-                min_precip = 8.0 if min_precip is None else min(min_precip, 8.0)
+    wants_rain = entry.get("wants_rain", False)
+    rain_levels = entry.get("rain_levels", [])
+    
+    if isinstance(rain_levels, str):
+        rain_levels = [rain_levels] if rain_levels else []
+    
+    if wants_rain and rain_levels:
+        min_precip = None
+        max_precip = None
+        
+        if "weak" in rain_levels:
+            min_precip = 1.0 if min_precip is None else min(min_precip, 1.0)
+            max_precip = 3.0 if max_precip is None else max(max_precip, 3.0)
+        
+        if "moderate" in rain_levels:
+            min_precip = 4.0 if min_precip is None else min(min_precip, 4.0)
+            max_precip = 7.0 if max_precip is None else max(max_precip, 7.0)
+        
+        if "strong" in rain_levels:
+            min_precip = 8.0 if min_precip is None else min(min_precip, 8.0)
                 max_precip = None
-
-            if min_precip is not None:
-                conditions["precip_min"] = min_precip
-                conditions["precipitations_min"] = min_precip
-                display["precip_min"] = min_precip
-
-            if max_precip is not None:
-                conditions["precip_max"] = max_precip
-                conditions["precipitations_max"] = max_precip
-                display["precip_max"] = max_precip
-            else:
-                if "strong" in rain_levels and len(rain_levels) == 1:
-                    conditions["precip_min"] = 8.0
-                    conditions["precipitations_min"] = 8.0
-                    display["precip_min"] = 8.0
-        elif not wants_rain:
-            conditions["precip_max"] = 0.0
-            conditions["precipitations_max"] = 0.0
-            display["precip_max"] = 0.0
+        
+        if min_precip is not None:
+            conditions["precip_min"] = min_precip
+            conditions["precipitations_min"] = min_precip
+            display["precip_min"] = min_precip
+        
+        if max_precip is not None:
+            conditions["precip_max"] = max_precip
+            conditions["precipitations_max"] = max_precip
+            display["precip_max"] = max_precip
         else:
-            precip_type = entry.get("precipitation_type", "minimum")
-            if precip_value is not None:
-                if precip_type == "minimum":
-                    conditions["precip_min"] = precip_value
-                    conditions["precipitations_min"] = precip_value
-                    display["precip_min"] = precip_value
-                else:
-                    conditions["precip_max"] = precip_value
-                    conditions["precipitations_max"] = precip_value
-                    display["precip_max"] = precip_value
+            if "strong" in rain_levels and len(rain_levels) == 1:
+                conditions["precip_min"] = 8.0
+                conditions["precipitations_min"] = 8.0
+                display["precip_min"] = 8.0
+    elif not wants_rain:
+        conditions["precip_max"] = 0.0
+        conditions["precipitations_max"] = 0.0
+        display["precip_max"] = 0.0
+    else:
+        precip_type = entry.get("precipitation_type", "minimum")
+        if precip_value is not None:
+            if precip_type == "minimum":
+                conditions["precip_min"] = precip_value
+                conditions["precipitations_min"] = precip_value
+                display["precip_min"] = precip_value
+            else:
+                conditions["precip_max"] = precip_value
+                conditions["precipitations_max"] = precip_value
+                display["precip_max"] = precip_value
 
     if enable_wind:
-        wind_type = entry.get("wind_type", "minimum")
-        if wind_type == "minimum":
-            conditions["vent_min"] = wind_value
-            conditions["vitesse_vent_min"] = wind_value
-            display["vent_min"] = wind_value
-        else:
-            conditions["vent_max"] = wind_value
-            conditions["vitesse_vent_max"] = wind_value
-            display["vent_max"] = wind_value
+    wind_type = entry.get("wind_type", "minimum")
+    if wind_type == "minimum":
+        conditions["vent_min"] = wind_value
+        conditions["vitesse_vent_min"] = wind_value
+        display["vent_min"] = wind_value
+    else:
+        conditions["vent_max"] = wind_value
+        conditions["vitesse_vent_max"] = wind_value
+        display["vent_max"] = wind_value
 
     if enable_uv and uv_value is not None:
         conditions["uv_min"] = uv_value
@@ -383,19 +383,19 @@ def transform_entries(entries: List[dict]) -> Tuple[List[dict], Dict[str, dict],
 
         wants_rain = entry.get("wants_rain")
         rain_levels = entry.get("rain_levels", [])
-
+        
         precip_value = parse_float(entry.get("precipitation_value"))
-
+        
         if enable_precipitation:
-            if wants_rain is None:
-                if precip_value is None:
-                    errors.append("précipitations invalides")
-            else:
-                if wants_rain:
-                    if isinstance(rain_levels, str):
-                        rain_levels = [rain_levels] if rain_levels else []
-                    if not rain_levels or len(rain_levels) == 0:
-                        errors.append("si vous voulez de la pluie, sélectionnez au moins un seuil")
+        if wants_rain is None:
+            if precip_value is None:
+                errors.append("précipitations invalides")
+        else:
+            if wants_rain:
+                if isinstance(rain_levels, str):
+                    rain_levels = [rain_levels] if rain_levels else []
+                if not rain_levels or len(rain_levels) == 0:
+                    errors.append("si vous voulez de la pluie, sélectionnez au moins un seuil")
 
         wind_value = parse_float(entry.get("wind_value"))
         if enable_wind and wind_value is None:
@@ -414,7 +414,7 @@ def transform_entries(entries: List[dict]) -> Tuple[List[dict], Dict[str, dict],
         label = base_label
         suffix = 2
         while label in seen_labels:
-            label = f"{base_label}
+            label = f"{base_label} #{suffix}"
             suffix += 1
         seen_labels.add(label)
 
@@ -533,10 +533,10 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
         smtp_password = None
         smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
         smtp_port_raw = os.getenv("SMTP_PORT", "587")
-        try:
-            smtp_port = int(smtp_port_raw)
-        except (TypeError, ValueError):
-            smtp_port = 587
+    try:
+        smtp_port = int(smtp_port_raw)
+    except (TypeError, ValueError):
+        smtp_port = 587
         print("[WARNING] Configuration SMTP incomplète. Les emails ne seront pas envoyés.")
 
     reports: Dict[str, dict] = {}
@@ -544,7 +544,7 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
     for store_label in stores_meta.keys():
         alert_triggered = store_label in decisions
         failure_count, should_notify = update_failure_counter(store_label, alert_triggered)
-
+        
         if not alert_triggered:
             if not should_notify:
                 reports[store_label] = {
@@ -563,9 +563,9 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
                     "failure_count": failure_count
                 }
                 continue
-
+    
     active_decisions = {k: v for k, v in decisions.items() if k in stores_meta and not reports.get(k, {}).get("silenced", False)}
-
+    
     if not active_decisions:
         smtp_context = {
             "configured": smtp_configured,
@@ -719,7 +719,7 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
             reports[store_label]["sent"] = bool(success)
             if success:
                 reports[store_label]["message"] = f"Synthèse globale envoyée à {global_recipient}."
-
+    
     for store_label in stores_meta.keys():
         if store_label not in reports:
             counters = load_failure_counters()
@@ -764,12 +764,12 @@ def build_results_payload(
 
         alert_triggered = store_label in decisions
         email_status = email_reports.get(store_label, {"sent": False, "message": "Aucune notification envoyée."})
-
+        
         if "failure_count" not in email_status:
             counters = load_failure_counters()
             failure_count = counters.get(store_label, 0)
             email_status["failure_count"] = failure_count
-
+        
         if not alert_triggered and not email_status.get("silenced", False):
             email_status["failure_info"] = {
                 "count": email_status.get("failure_count", 0)
