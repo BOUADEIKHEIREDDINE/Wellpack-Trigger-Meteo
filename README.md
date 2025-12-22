@@ -2,7 +2,7 @@
 
 Application web Flask pour analyser les conditions météorologiques et envoyer des alertes par email lorsque les seuils configurés sont atteints pour différentes filiales.
 
-## 📋 Fonctionnalités
+## Fonctionnalités
 
 - **Analyse météorologique** : Vérification automatique des conditions météo (température, précipitations, vent, UV) pour plusieurs filiales
 - **Interface web intuitive** : Formulaire interactif pour configurer les seuils et périodes d'analyse
@@ -12,7 +12,7 @@ Application web Flask pour analyser les conditions météorologiques et envoyer 
 - **Exécution planifiée** : Script de backend pour analyses automatiques quotidiennes
 - **Mise à jour en temps réel** : Interface mise à jour dynamiquement lors de l'exécution du backend
 
-## 🏗️ Structure du Projet
+## Structure du Projet
 
 ```
 Wellpack_predictor/
@@ -42,7 +42,7 @@ Wellpack_predictor/
 └── README.md
 ```
 
-## 🚀 Installation
+## Installation
 
 ### Prérequis
 
@@ -74,7 +74,7 @@ Wellpack_predictor/
    
    Utiliser les Repository Secrets de GitHub Actions pour configurer les variables d'environnement SMTP et PostgreSQL.
 
-## 💻 Utilisation
+## Utilisation
 
 ### Mode Web (Interface utilisateur)
 
@@ -190,18 +190,18 @@ L'application envoie un **email unique de synthèse** regroupant toutes les fili
 - **APScheduler** : Planification de tâches (optionnel)
 - **gunicorn** : Serveur WSGI pour la production (optionnel)
 
-## 📊 API Météorologique
+## API Météorologique
 
 L'application utilise l'API **Open-Meteo** pour récupérer les données météorologiques historiques et prévisionnelles.
 
-## 🗄️ Stockage des Données
+## Stockage des Données
 
 - **Cache** : `data/cache/cache.json`
   - `last_input` : Dernière configuration soumise
   - `state` : État de la dernière exécution
   - `failure_counters` : Compteurs d'échecs consécutifs par filiale
 
-## 🐛 Dépannage
+## Dépannage
 
 ### Erreur "ModuleNotFoundError: No module named 'app'"
 
@@ -222,7 +222,7 @@ Vérifier :
 3. Les identifiants sont valides
 4. Le port SMTP est correct (587 pour Gmail)
 
-## 📝 Notes
+## Notes
 
 - Le projet utilise un système de cache JSON (pas de base de données SQL)
 - Les traces SQL ont été supprimées comme demandé
