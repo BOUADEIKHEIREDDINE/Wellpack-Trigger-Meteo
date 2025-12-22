@@ -144,7 +144,7 @@ Le script :
 - Envoie un email si les conditions sont remplies
 - Met à jour les compteurs d'échecs consécutifs
 
-## ⚙️ Configuration
+## Configuration
 
 ### Mécanisme de seuil
 
@@ -167,7 +167,7 @@ Les conditions peuvent être activées/désactivées individuellement via des ca
 
 Le système applique une tolérance de **1/3 des jours** dans la fenêtre d'analyse : si moins d'un tiers des jours ne respectent pas les conditions, la filiale est considérée comme conforme.
 
-## 📧 Format des Emails
+## Format des Emails
 
 L'application envoie un **email unique de synthèse** regroupant toutes les filiales conformes :
 
@@ -180,7 +180,7 @@ L'application envoie un **email unique de synthèse** regroupant toutes les fili
   - Seuils configurés
   - Prévisions détaillées (date, température, vent, précipitations)
 
-## 🔧 Dépendances
+## Dépendances
 
 - **Flask** : Framework web
 - **pandas** : Manipulation de données
