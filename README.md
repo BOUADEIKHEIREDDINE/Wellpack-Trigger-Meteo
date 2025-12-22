@@ -229,7 +229,7 @@ Vérifier :
 - Le fichier `.env` est ignoré par Git pour la sécurité
 - En production, utiliser GitHub Actions Secrets pour les variables sensibles
 
-## 📄 Licence
+## Licence
 
 Ce projet est un projet académique développé dans le cadre du cours AI_Clinic.
 
