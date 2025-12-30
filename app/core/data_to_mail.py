@@ -10,8 +10,6 @@ from app.config.settings import CACHE_FILE, CONDITIONS_FILE
 from .weather_analyser import decision_maker_daily
 from .mail_sending import envoyer_email
 
-CACHE_PATH = str(CACHE_FILE)
-
 MAX_CONSECUTIVE_FAILURES = 7
 FAILURE_THRESHOLD_ENABLED = True
 
@@ -219,9 +217,13 @@ def build_entries_from_excel(file_obj) -> List[dict]:
 
         precip_raw = df.iat[row_idx, 6] if df.shape[1] > 6 else None
         wants_rain, rain_levels = _parse_precip_cell(precip_raw)
+        # Désactiver les précipitations si la cellule est vide
+        enable_precipitation = precip_raw not in (None, "", " ") and not (isinstance(precip_raw, float) and pd.isna(precip_raw))
 
         wind_raw = df.iat[row_idx, 7] if df.shape[1] > 7 else None
         wind_type, wind_value = _parse_threshold_cell(wind_raw)
+        # Désactiver le vent si la cellule est vide
+        enable_wind = wind_raw not in (None, "", " ") and not (isinstance(wind_raw, float) and pd.isna(wind_raw))
         wind_value_str = "" if wind_value is None else str(wind_value)
         if wind_type is None:
             wind_type = "minimum"
@@ -229,6 +231,8 @@ def build_entries_from_excel(file_obj) -> List[dict]:
 
         temp_raw = df.iat[row_idx, 8] if df.shape[1] > 8 else None
         temp_type, temp_value = _parse_threshold_cell(temp_raw)
+        # Désactiver la température si la cellule est vide
+        enable_temperature = temp_raw not in (None, "", " ") and not (isinstance(temp_raw, float) and pd.isna(temp_raw))
         temp_value_str = "" if temp_value is None else str(temp_value)
         if temp_type is None:
             temp_type = "minimum"
@@ -236,6 +240,8 @@ def build_entries_from_excel(file_obj) -> List[dict]:
 
         uv_raw = df.iat[row_idx, 9] if df.shape[1] > 9 else None
         _, uv_value = _parse_threshold_cell(uv_raw)
+        # Désactiver l'UV si la cellule est vide
+        enable_uv = uv_raw not in (None, "", " ") and not (isinstance(uv_raw, float) and pd.isna(uv_raw))
         uv_value_str = "" if uv_value is None else str(uv_value)
 
         entry = {
@@ -252,6 +258,10 @@ def build_entries_from_excel(file_obj) -> List[dict]:
             "temperature_type": temp_type,
             "temperature_value": temp_value_str,
             "uv_min": uv_value_str,
+            "enable_temperature": enable_temperature,
+            "enable_precipitation": enable_precipitation,
+            "enable_wind": enable_wind,
+            "enable_uv": enable_uv,
         }
 
         entries.append(entry)
@@ -846,9 +856,6 @@ def execute_analysis(entries_raw: str) -> Tuple[dict, List[dict], List[str], dic
     }
 
     return summary, stores_results, issues, smtp_context
-
-def should_run_now(cache: dict) -> bool:
-    return True
 
 def mark_run(cache: dict) -> None:
     try:

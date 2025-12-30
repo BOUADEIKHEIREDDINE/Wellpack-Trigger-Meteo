@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, jsonify, send_file
 import json
+import os
 import threading
 import time
 import webbrowser
@@ -143,7 +144,9 @@ if __name__ == "__main__":
         time.sleep(1)
         webbrowser.open_new("http://127.0.0.1:5000")
 
-    threading.Thread(target=open_browser, daemon=True).start()
+    # N'ouvrir le navigateur que dans le processus principal (pas dans le reloader)
+    if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
+        threading.Thread(target=open_browser, daemon=True).start()
 
     app.run(host="127.0.0.1", port=5000, debug=True, use_reloader=True)
 
