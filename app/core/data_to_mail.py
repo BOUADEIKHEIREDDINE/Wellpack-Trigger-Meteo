@@ -7,13 +7,13 @@ from typing import Dict, List, Tuple, Optional
 import pandas as pd
 
 from app.config.settings import CACHE_FILE, CONDITIONS_FILE
-from .weather_analyser import decision_maker_daily
-from .mail_sending import envoyer_email
+from .weather_analyser import decisionMakerDaily
+from .mail_sending import envoyerEmail
 
 MAX_CONSECUTIVE_FAILURES = 7
 FAILURE_THRESHOLD_ENABLED = True
 
-def validate_smtp_config() -> Tuple[Optional[str], Optional[str], str, int]:
+def validateSmtpConfig() -> Tuple[Optional[str], Optional[str], str, int]:
 
     smtp_email = os.getenv("SMTP_EMAIL")
     smtp_password = os.getenv("SMTP_PASSWORD")
@@ -40,7 +40,7 @@ def validate_smtp_config() -> Tuple[Optional[str], Optional[str], str, int]:
 
     return smtp_email, smtp_password, smtp_server, smtp_port
 
-def load_env_file(path: str) -> None:
+def loadEnvFile(path: str) -> None:
     if not os.path.isfile(path):
         return
     try:
@@ -61,7 +61,7 @@ def load_env_file(path: str) -> None:
     except Exception as e:
         print(f"[WARNING] Erreur lors du chargement du fichier .env: {e}")
 
-def load_failure_counters() -> Dict[str, int]:
+def loadFailureCounters() -> Dict[str, int]:
     try:
         if CACHE_FILE.exists():
             with CACHE_FILE.open("r", encoding="utf-8") as f:
@@ -71,7 +71,7 @@ def load_failure_counters() -> Dict[str, int]:
         pass
     return {}
 
-def save_failure_counters(counters: Dict[str, int]) -> None:
+def saveFailureCounters(counters: Dict[str, int]) -> None:
     try:
         cache = {}
         if CACHE_FILE.exists():
@@ -85,30 +85,30 @@ def save_failure_counters(counters: Dict[str, int]) -> None:
     except Exception as e:
         print(f"Erreur sauvegarde compteurs: {e}")
 
-def update_failure_counter(store_label: str, success: bool) -> Tuple[int, bool]:
+def updateFailureCounter(store_label: str, success: bool) -> Tuple[int, bool]:
     if not FAILURE_THRESHOLD_ENABLED:
         return 0, True
     
-    counters = load_failure_counters()
+    counters = loadFailureCounters()
     
     if success:
         if store_label in counters:
             del counters[store_label]
-        save_failure_counters(counters)
+        saveFailureCounters(counters)
         return 0, True
     else:
         current_count = counters.get(store_label, 0) + 1
         counters[store_label] = current_count
-        save_failure_counters(counters)
+        saveFailureCounters(counters)
         
         should_notify = current_count < MAX_CONSECUTIVE_FAILURES
         return current_count, should_notify
 
-def sanitize_store_name(name: str) -> str:
+def sanitizeStoreName(name: str) -> str:
     slug = re.sub(r"[^a-zA-Z0-9]+", "_", name).strip("_").lower()
     return slug or "magasin"
 
-def parse_float(value) -> Optional[float]:
+def parseFloat(value) -> Optional[float]:
     if value in (None, "", " ", "null"):
         return None
     if isinstance(value, (int, float)):
@@ -118,7 +118,7 @@ def parse_float(value) -> Optional[float]:
     except (TypeError, ValueError):
         return None
 
-def parse_int(
+def parseInt(
     value,
     *,
     default: int = 0,
@@ -135,7 +135,7 @@ def parse_int(
         result = min(maximum, result)
     return result
 
-def _parse_precip_cell(value) -> Tuple[bool, List[str]]:
+def _parsePrecipCell(value) -> Tuple[bool, List[str]]:
     if value in (None, "", " "):
         return False, []
 
@@ -160,7 +160,7 @@ def _parse_precip_cell(value) -> Tuple[bool, List[str]]:
 
 _THRESHOLD_RE = re.compile(r"([<>]=?)\s*([-+]?\d+(?:[.,]\d+)?)")
 
-def _parse_threshold_cell(value) -> Tuple[Optional[str], Optional[float]]:
+def _parseThresholdCell(value) -> Tuple[Optional[str], Optional[float]]:
     if value in (None, "", " "):
         return None, None
 
@@ -178,7 +178,7 @@ def _parse_threshold_cell(value) -> Tuple[Optional[str], Optional[float]]:
     threshold_type = "minimum" if ">" in op else "maximum"
     return threshold_type, val
 
-def build_entries_from_excel(file_obj) -> List[dict]:
+def buildEntriesFromExcel(file_obj) -> List[dict]:
 
     df = pd.read_excel(file_obj, header=None)
 
@@ -212,16 +212,16 @@ def build_entries_from_excel(file_obj) -> List[dict]:
 
         days_past_raw = df.iat[row_idx, 4] if df.shape[1] > 4 else 0
         days_future_raw = df.iat[row_idx, 5] if df.shape[1] > 5 else 0
-        days_past = parse_int(days_past_raw or 0, default=0, minimum=0, maximum=5)
-        days_future = parse_int(days_future_raw or 0, default=0, minimum=0, maximum=5)
+        days_past = parseInt(days_past_raw or 0, default=0, minimum=0, maximum=5)
+        days_future = parseInt(days_future_raw or 0, default=0, minimum=0, maximum=5)
 
         precip_raw = df.iat[row_idx, 6] if df.shape[1] > 6 else None
-        wants_rain, rain_levels = _parse_precip_cell(precip_raw)
+        wants_rain, rain_levels = _parsePrecipCell(precip_raw)
         # Désactiver les précipitations si la cellule est vide
         enable_precipitation = precip_raw not in (None, "", " ") and not (isinstance(precip_raw, float) and pd.isna(precip_raw))
 
         wind_raw = df.iat[row_idx, 7] if df.shape[1] > 7 else None
-        wind_type, wind_value = _parse_threshold_cell(wind_raw)
+        wind_type, wind_value = _parseThresholdCell(wind_raw)
         # Désactiver le vent si la cellule est vide
         enable_wind = wind_raw not in (None, "", " ") and not (isinstance(wind_raw, float) and pd.isna(wind_raw))
         wind_value_str = "" if wind_value is None else str(wind_value)
@@ -230,7 +230,7 @@ def build_entries_from_excel(file_obj) -> List[dict]:
             wind_value_str = "0"
 
         temp_raw = df.iat[row_idx, 8] if df.shape[1] > 8 else None
-        temp_type, temp_value = _parse_threshold_cell(temp_raw)
+        temp_type, temp_value = _parseThresholdCell(temp_raw)
         # Désactiver la température si la cellule est vide
         enable_temperature = temp_raw not in (None, "", " ") and not (isinstance(temp_raw, float) and pd.isna(temp_raw))
         temp_value_str = "" if temp_value is None else str(temp_value)
@@ -239,7 +239,7 @@ def build_entries_from_excel(file_obj) -> List[dict]:
             temp_value_str = "0"
 
         uv_raw = df.iat[row_idx, 9] if df.shape[1] > 9 else None
-        _, uv_value = _parse_threshold_cell(uv_raw)
+        _, uv_value = _parseThresholdCell(uv_raw)
         # Désactiver l'UV si la cellule est vide
         enable_uv = uv_raw not in (None, "", " ") and not (isinstance(uv_raw, float) and pd.isna(uv_raw))
         uv_value_str = "" if uv_value is None else str(uv_value)
@@ -268,7 +268,7 @@ def build_entries_from_excel(file_obj) -> List[dict]:
 
     return entries
 
-def build_conditions(entry: dict, temp_value: float, precip_value: Optional[float], wind_value: float, uv_value: Optional[float]
+def buildConditions(entry: dict, temp_value: float, precip_value: Optional[float], wind_value: float, uv_value: Optional[float]
                      ) -> Tuple[Dict[str, float], Dict[str, float]]:
     conditions: Dict[str, float] = {}
     display: Dict[str, float] = {}
@@ -362,7 +362,7 @@ def build_conditions(entry: dict, temp_value: float, precip_value: Optional[floa
 
     return conditions, display
 
-def transform_entries(entries: List[dict]) -> Tuple[List[dict], Dict[str, dict], List[str]]:
+def transformEntries(entries: List[dict]) -> Tuple[List[dict], Dict[str, dict], List[str]]:
     modules_rows: List[dict] = []
     stores_meta: Dict[str, dict] = {}
     issues: List[str] = []
@@ -387,14 +387,14 @@ def transform_entries(entries: List[dict]) -> Tuple[List[dict], Dict[str, dict],
         enable_wind = entry.get("enable_wind", True)
         enable_uv = entry.get("enable_uv", True)
 
-        temp_value = parse_float(entry.get("temperature_value"))
+        temp_value = parseFloat(entry.get("temperature_value"))
         if enable_temperature and temp_value is None:
             errors.append("température invalide")
 
         wants_rain = entry.get("wants_rain")
         rain_levels = entry.get("rain_levels", [])
         
-        precip_value = parse_float(entry.get("precipitation_value"))
+        precip_value = parseFloat(entry.get("precipitation_value"))
         
         if enable_precipitation:
             if wants_rain is None:
@@ -407,14 +407,14 @@ def transform_entries(entries: List[dict]) -> Tuple[List[dict], Dict[str, dict],
                     if not rain_levels or len(rain_levels) == 0:
                         errors.append("si vous voulez de la pluie, sélectionnez au moins un seuil")
 
-        wind_value = parse_float(entry.get("wind_value"))
+        wind_value = parseFloat(entry.get("wind_value"))
         if enable_wind and wind_value is None:
             errors.append("vitesse du vent invalide")
 
-        uv_value = parse_float(entry.get("uv_min"))
+        uv_value = parseFloat(entry.get("uv_min"))
 
-        days_future = parse_int(entry.get("days_future", 0), default=0, minimum=0, maximum=5)
-        days_past = parse_int(entry.get("days_past", 0), default=0, minimum=0, maximum=5) if analyze_past else 0
+        days_future = parseInt(entry.get("days_future", 0), default=0, minimum=0, maximum=5)
+        days_past = parseInt(entry.get("days_past", 0), default=0, minimum=0, maximum=5) if analyze_past else 0
 
         if errors:
             issues.append(f"Ligne {idx}: " + ", ".join(errors))
@@ -428,7 +428,7 @@ def transform_entries(entries: List[dict]) -> Tuple[List[dict], Dict[str, dict],
             suffix += 1
         seen_labels.add(label)
 
-        conditions, display_conditions = build_conditions(entry, temp_value, precip_value, wind_value, uv_value)
+        conditions, display_conditions = buildConditions(entry, temp_value, precip_value, wind_value, uv_value)
 
         modules_rows.append({
             "magasin": label,
@@ -450,7 +450,7 @@ def transform_entries(entries: List[dict]) -> Tuple[List[dict], Dict[str, dict],
 
     return modules_rows, stores_meta, issues
 
-def format_conditions_display(conditions: Dict[str, float]) -> List[dict]:
+def formatConditionsDisplay(conditions: Dict[str, float]) -> List[dict]:
     mapping = [
         ("temp_min", "Température min.", "°C"),
         ("temp_max", "Température max.", "°C"),
@@ -473,7 +473,7 @@ def format_conditions_display(conditions: Dict[str, float]) -> List[dict]:
         items.append({"label": "Conditions", "value": "Aucune contrainte définie"})
     return items
 
-def format_number(value, decimals: int = 1) -> str:
+def formatNumber(value, decimals: int = 1) -> str:
     if value in (None, "", "nan"):
         return "—"
     try:
@@ -483,9 +483,9 @@ def format_number(value, decimals: int = 1) -> str:
     except (TypeError, ValueError):
         return str(value)
 
-def build_email_body(store_label: str, store_meta: dict, store_daily: pd.DataFrame) -> str:
+def buildEmailBody(store_label: str, store_meta: dict, store_daily: pd.DataFrame) -> str:
     window = store_meta.get("window", {"avant": 0, "apres": 0})
-    conditions_display = format_conditions_display(store_meta.get("conditions", {}))
+    conditions_display = formatConditionsDisplay(store_meta.get("conditions", {}))
 
     lines = [
         "Bonjour,",
@@ -507,9 +507,9 @@ def build_email_body(store_label: str, store_meta: dict, store_daily: pd.DataFra
             day_status = "✅ Conforme" if bool(row.get("state")) else "⚠️ Non conforme"
             date_str = row.get("date") or "N/A"
             jour = row.get("jour_relatif") or "-"
-            temp = format_number(row.get("temp_12h"))
-            vent = format_number(row.get("vent_12h"))
-            precip = format_number(row.get("precipitations_12h"))
+            temp = formatNumber(row.get("temp_12h"))
+            vent = formatNumber(row.get("vent_12h"))
+            precip = formatNumber(row.get("precipitations_12h"))
             lines.append(
                 f"{day_status} · {jour} ({date_str}) — Temp {temp}°C · Vent {vent} km/h · Précip {precip} mm"
             )
@@ -521,9 +521,9 @@ def build_email_body(store_label: str, store_meta: dict, store_daily: pd.DataFra
             for _, row in non_conformes.iterrows():
                 date_str = row.get("date") or "N/A"
                 jour = row.get("jour_relatif") or "-"
-                temp = format_number(row.get("temp_12h"))
-                vent = format_number(row.get("vent_12h"))
-                precip = format_number(row.get("precipitations_12h"))
+                temp = formatNumber(row.get("temp_12h"))
+                vent = formatNumber(row.get("vent_12h"))
+                precip = formatNumber(row.get("precipitations_12h"))
                 lines.append(f" • {jour} ({date_str}) — Temp {temp}°C · Vent {vent} km/h · Précip {precip} mm")
 
     lines.extend([
@@ -533,9 +533,9 @@ def build_email_body(store_label: str, store_meta: dict, store_daily: pd.DataFra
     ])
     return "\n".join(lines)
 
-def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.DataFrame) -> Tuple[Dict[str, dict], dict]:
+def sendAlerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.DataFrame) -> Tuple[Dict[str, dict], dict]:
     try:
-        smtp_email, smtp_password, smtp_server, smtp_port = validate_smtp_config()
+        smtp_email, smtp_password, smtp_server, smtp_port = validateSmtpConfig()
         smtp_configured = True
     except ValueError as e:
         smtp_configured = False
@@ -553,7 +553,7 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
 
     for store_label in stores_meta.keys():
         alert_triggered = store_label in decisions
-        failure_count, should_notify = update_failure_counter(store_label, alert_triggered)
+        failure_count, should_notify = updateFailureCounter(store_label, alert_triggered)
         
         if not alert_triggered:
             if not should_notify:
@@ -654,11 +654,11 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
         vent_min = raw_conditions.get("vent_min", raw_conditions.get("vitesse_vent_min"))
 
         if temp_min is not None:
-            lines.append(f"• Température min : {format_number(temp_min)}°C")
+            lines.append(f"• Température min : {formatNumber(temp_min)}°C")
         if precip_max is not None:
-            lines.append(f"• Précipitations max : {format_number(precip_max)} mm")
+            lines.append(f"• Précipitations max : {formatNumber(precip_max)} mm")
         if vent_min is not None:
-            lines.append(f"• Vent min : {format_number(vent_min)} km/h")
+            lines.append(f"• Vent min : {formatNumber(vent_min)} km/h")
 
         lines.append("")
 
@@ -683,9 +683,9 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
                 selected_row = store_daily.iloc[0]
 
         date_str = selected_row.get("date") or "N/A"
-        temp = format_number(selected_row.get("temp_12h"))
-        vent = format_number(selected_row.get("vent_12h"))
-        precip = format_number(selected_row.get("precipitations_12h"))
+        temp = formatNumber(selected_row.get("temp_12h"))
+        vent = formatNumber(selected_row.get("vent_12h"))
+        precip = formatNumber(selected_row.get("precipitations_12h"))
 
         lines.append(f"Prévision du {date_str} :")
         lines.append("✅ Conforme")
@@ -703,7 +703,7 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
     subject = "Synthèse météo – Filiales conformes"
     body = "\n".join(lines)
 
-    success = envoyer_email(
+    success = envoyerEmail(
         expediteur_email=smtp_email,
         expediteur_password=smtp_password,
         destinataire_email=global_recipient,
@@ -732,7 +732,7 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
     
     for store_label in stores_meta.keys():
         if store_label not in reports:
-            counters = load_failure_counters()
+            counters = loadFailureCounters()
             failure_count = counters.get(store_label, 0)
             reports[store_label] = {
                 "sent": False,
@@ -750,7 +750,7 @@ def send_alerts(decisions: dict, stores_meta: Dict[str, dict], df_daily: pd.Data
 
     return reports, smtp_context
 
-def build_results_payload(
+def buildResultsPayload(
     stores_meta: Dict[str, dict],
     decisions: dict,
     df_daily: pd.DataFrame,
@@ -765,9 +765,9 @@ def build_results_payload(
                 store_days.append({
                     "date": row.get("date"),
                     "jour": row.get("jour_relatif"),
-                    "temp": format_number(row.get("temp_12h")),
-                    "vent": format_number(row.get("vent_12h")),
-                    "precip": format_number(row.get("precipitations_12h")),
+                    "temp": formatNumber(row.get("temp_12h")),
+                    "vent": formatNumber(row.get("vent_12h")),
+                    "precip": formatNumber(row.get("precipitations_12h")),
                     "state": bool(row.get("state")),
                     "error": row.get("erreur"),
                 })
@@ -776,7 +776,7 @@ def build_results_payload(
         email_status = email_reports.get(store_label, {"sent": False, "message": "Aucune notification envoyée."})
         
         if "failure_count" not in email_status:
-            counters = load_failure_counters()
+            counters = loadFailureCounters()
             failure_count = counters.get(store_label, 0)
             email_status["failure_count"] = failure_count
         
@@ -791,7 +791,7 @@ def build_results_payload(
             "postal_code": meta["postal_code"],
             "email": meta["email"],
             "window": meta["window"],
-            "conditions": format_conditions_display(meta.get("conditions", {})),
+            "conditions": formatConditionsDisplay(meta.get("conditions", {})),
             "raw_conditions": meta.get("conditions", {}),
             "days": store_days,
             "alert_triggered": alert_triggered,
@@ -799,13 +799,13 @@ def build_results_payload(
         })
     return results
 
-def execute_analysis(entries_raw: str) -> Tuple[dict, List[dict], List[str], dict]:
+def executeAnalysis(entries_raw: str) -> Tuple[dict, List[dict], List[str], dict]:
     try:
         entries = json.loads(entries_raw or "[]")
     except json.JSONDecodeError:
         entries = []
 
-    module_rows, stores_meta, issues = transform_entries(entries)
+    module_rows, stores_meta, issues = transformEntries(entries)
 
     if not module_rows:
         summary = {
@@ -822,7 +822,7 @@ def execute_analysis(entries_raw: str) -> Tuple[dict, List[dict], List[str], dic
     df_input = pd.DataFrame(module_rows)
 
     try:
-        decisions, df_daily = decision_maker_daily(df_input)
+        decisions, df_daily = decisionMakerDaily(df_input)
     except Exception as exc:
         summary = {
             "total": 0,
@@ -837,8 +837,8 @@ def execute_analysis(entries_raw: str) -> Tuple[dict, List[dict], List[str], dic
         return summary, [], issues + [message], smtp_context
 
     df_daily = df_daily if isinstance(df_daily, pd.DataFrame) else pd.DataFrame()
-    email_reports, smtp_context = send_alerts(decisions, stores_meta, df_daily)
-    stores_results = build_results_payload(stores_meta, decisions, df_daily, email_reports)
+    email_reports, smtp_context = sendAlerts(decisions, stores_meta, df_daily)
+    stores_results = buildResultsPayload(stores_meta, decisions, df_daily, email_reports)
 
     total_points = len(stores_results)
     triggered_points = sum(1 for store in stores_results if store["alert_triggered"])
@@ -857,7 +857,7 @@ def execute_analysis(entries_raw: str) -> Tuple[dict, List[dict], List[str], dic
 
     return summary, stores_results, issues, smtp_context
 
-def mark_run(cache: dict) -> None:
+def markRun(cache: dict) -> None:
     try:
         cache = dict(cache or {})
         cache["last_run"] = datetime.now().isoformat(timespec="seconds")

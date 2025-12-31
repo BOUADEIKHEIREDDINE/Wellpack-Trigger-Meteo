@@ -4,7 +4,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 
-def envoyer_email(
+def envoyerEmail(
     expediteur_email,
     expediteur_password,
     destinataire_email,

@@ -7,16 +7,16 @@ import webbrowser
 
 from app.config.settings import BASE_DIR, CACHE_FILE, CONDITIONS_FILE, TEMPLATES_DIR
 from app.core.data_to_mail import (
-    load_env_file,
-    execute_analysis,
-    mark_run,
-    build_entries_from_excel,
-    load_failure_counters,
+    loadEnvFile,
+    executeAnalysis,
+    markRun,
+    buildEntriesFromExcel,
+    loadFailureCounters,
 )
 
 env_file_path = BASE_DIR / ".env"
 if env_file_path.exists():
-    load_env_file(str(env_file_path))
+    loadEnvFile(str(env_file_path))
 
 app = Flask(__name__, template_folder=str(TEMPLATES_DIR))
 
@@ -27,7 +27,7 @@ def index():
 @app.route("/submit", methods=["POST"]) 
 def submit():
     entries_payload = request.form.get("entries_payload", "[]")
-    summary, stores_results, issues, smtp_context = execute_analysis(entries_payload)
+    summary, stores_results, issues, smtp_context = executeAnalysis(entries_payload)
 
     try:
         if CACHE_FILE.exists():
@@ -42,7 +42,7 @@ def submit():
     cache["state"] = bool(summary.get("emails_sent", 0))
 
     try:
-        mark_run(cache)
+        markRun(cache)
     except Exception:
         pass
 
@@ -67,21 +67,21 @@ def cron():
     return jsonify({"ok": False, "reason": "deprecated_endpoint"}), 404
 
 @app.route("/download-excel-template", methods=["GET"])
-def download_excel_template():
+def downloadExcelTemplate():
     excel_path = CONDITIONS_FILE
     if excel_path.exists():
         return send_file(str(excel_path), as_attachment=True, download_name="Conditions.xlsx")
     return jsonify({"error": "Fichier Excel non trouvé"}), 404
 
 @app.route("/export-excel", methods=["GET", "POST"])
-def export_excel():
+def exportExcel():
     if request.method == "POST":
         excel_file = request.files.get("excel_file")
         if not excel_file or excel_file.filename == "":
             return render_template("export_excel.html", message="Veuillez sélectionner un fichier Excel.")
 
         try:
-            entries = build_entries_from_excel(excel_file)
+            entries = buildEntriesFromExcel(excel_file)
         except Exception as exc:
             return render_template(
                 "export_excel.html",
@@ -95,7 +95,7 @@ def export_excel():
             )
 
         entries_payload = json.dumps(entries, ensure_ascii=False)
-        summary, stores_results, issues, smtp_context = execute_analysis(entries_payload)
+        summary, stores_results, issues, smtp_context = executeAnalysis(entries_payload)
 
         try:
             if CACHE_FILE.exists():
@@ -110,7 +110,7 @@ def export_excel():
         cache["state"] = bool(summary.get("emails_sent", 0))
 
         try:
-            mark_run(cache)
+            markRun(cache)
         except Exception:
             pass
 
@@ -132,21 +132,21 @@ def export_excel():
     return render_template("export_excel.html")
 
 @app.route("/api/failure-counters", methods=["GET"])
-def api_failure_counters():
+def apiFailureCounters():
     try:
-        counters = load_failure_counters()
+        counters = loadFailureCounters()
         return jsonify({"success": True, "counters": counters})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
-    def open_browser():
+    def openBrowser():
         time.sleep(1)
         webbrowser.open_new("http://127.0.0.1:5000")
 
     # N'ouvrir le navigateur que dans le processus principal (pas dans le reloader)
     if os.environ.get('WERKZEUG_RUN_MAIN') != 'true':
-        threading.Thread(target=open_browser, daemon=True).start()
+        threading.Thread(target=openBrowser, daemon=True).start()
 
     app.run(host="127.0.0.1", port=5000, debug=True, use_reloader=True)
 

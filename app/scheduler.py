@@ -5,22 +5,22 @@ from typing import List, Tuple
 import pandas as pd
 
 from app.config.settings import CACHE_FILE
-from app.core.data_to_mail import execute_analysis, mark_run, transform_entries
-from app.core.weather_analyser import decision_maker_daily
+from app.core.data_to_mail import executeAnalysis, markRun, transformEntries
+from app.core.weather_analyser import decisionMakerDaily
 
-def evaluate_conditions(entries_raw: str) -> Tuple[bool, List[str]]:
+def evaluateConditions(entries_raw: str) -> Tuple[bool, List[str]]:
     try:
         entries = json.loads(entries_raw or "[]")
     except json.JSONDecodeError as exc:
         return False, [f"Entrées invalides (JSON): {exc}"]
 
-    module_rows, _, issues = transform_entries(entries)
+    module_rows, _, issues = transformEntries(entries)
     if not module_rows:
         return False, issues or ["Aucune entrée exploitable pour l'analyse."]
 
     df_input = pd.DataFrame(module_rows)
     try:
-        decisions, _ = decision_maker_daily(df_input)
+        decisions, _ = decisionMakerDaily(df_input)
     except Exception as exc:
         issues = issues or []
         issues.append(f"Erreur lors de l'évaluation des conditions: {exc}")
@@ -28,7 +28,7 @@ def evaluate_conditions(entries_raw: str) -> Tuple[bool, List[str]]:
 
     return bool(decisions), issues
 
-def should_send_mail(previous_state: bool, conditions_ok: bool, first_run: bool) -> bool:
+def shouldSendMail(previous_state: bool, conditions_ok: bool, first_run: bool) -> bool:
     if first_run:
         return conditions_ok
 
@@ -62,17 +62,17 @@ def main():
     previous_state = bool(cache.get("state")) if "state" in cache else False
     first_run = "state" not in cache
 
-    conditions_ok, eval_issues = evaluate_conditions(entries_raw)
+    conditions_ok, eval_issues = evaluateConditions(entries_raw)
     if eval_issues:
         print("Evaluation issues:")
         for issue in eval_issues:
             print(f"- {issue}")
 
-    send_mail = should_send_mail(previous_state, conditions_ok, first_run)
+    send_mail = shouldSendMail(previous_state, conditions_ok, first_run)
 
     if send_mail:
         print(f"Starting weather analysis at {datetime.now().isoformat(timespec='seconds')}")
-        summary, _, issues, _ = execute_analysis(entries_raw)
+        summary, _, issues, _ = executeAnalysis(entries_raw)
 
         if issues:
             print("Issues during analysis:")
@@ -85,7 +85,7 @@ def main():
         print("No state change detected. Skipping email dispatch.")
 
     cache["state"] = conditions_ok
-    mark_run(cache)
+    markRun(cache)
 
 if __name__ == "__main__":
     main()

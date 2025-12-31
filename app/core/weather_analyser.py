@@ -5,7 +5,7 @@ import os
 from datetime import datetime, timedelta
 from typing import Dict, Tuple, Optional, List
 
-def geocode_postal_code(cp: str, country: str = "FR"):
+def geocodePostalCode(cp: str, country: str = "FR"):
     url = (
         "https://geocoding-api.open-meteo.com/v1/search?"
         f"name={cp}&count=1&language=fr&format=json&country={country}"
@@ -19,7 +19,7 @@ def geocode_postal_code(cp: str, country: str = "FR"):
     res = data["results"][0]
     return res["latitude"], res["longitude"]
 
-def fetch_noon_temperature(lat: float, lon: float, forecast_days: int = 5):
+def fetchNoonTemperature(lat: float, lon: float, forecast_days: int = 5):
 
     forecast_days = min(max(1, int(forecast_days)), 16)
     url = (
@@ -49,7 +49,7 @@ def fetch_noon_temperature(lat: float, lon: float, forecast_days: int = 5):
 
     return {"time": noon_times, "temperature_2m": noon_temps}
 
-def fetch_noon_precipitation(lat: float, lon: float, forecast_days: int = 5):
+def fetchNoonPrecipitation(lat: float, lon: float, forecast_days: int = 5):
 
     forecast_days = min(max(1, int(forecast_days)), 16)
     url = (
@@ -79,7 +79,7 @@ def fetch_noon_precipitation(lat: float, lon: float, forecast_days: int = 5):
 
     return {"time": noon_times, "precipitation": noon_precip}
 
-def fetch_noon_wind_speed(lat: float, lon: float, forecast_days: int = 5):
+def fetchNoonWindSpeed(lat: float, lon: float, forecast_days: int = 5):
 
     forecast_days = min(max(1, int(forecast_days)), 16)
     url = (
@@ -109,16 +109,16 @@ def fetch_noon_wind_speed(lat: float, lon: float, forecast_days: int = 5):
 
     return {"time": noon_times, "windspeed_10m": noon_winds}
 
-def fetch_daily_forecast(lat: float, lon: float):
-    return fetch_noon_temperature(lat, lon)
+def fetchDailyForecast(lat: float, lon: float):
+    return fetchNoonTemperature(lat, lon)
 
-def _check_conditions_single_day(row):
+def _checkConditionsSingleDay(row):
 
     cond = row.get("conditions_meteo")
     if not isinstance(cond, dict):
         return False
 
-    def _to_float(value):
+    def _toFloat(value):
         try:
             if value is None:
                 return None
@@ -129,8 +129,8 @@ def _check_conditions_single_day(row):
         except Exception:
             return None
 
-    def _within_thresholds(actual, min_key, max_key):
-        actual_val = _to_float(actual)
+    def _withinThresholds(actual, min_key, max_key):
+        actual_val = _toFloat(actual)
         if actual_val is None:
             return True
         try:
@@ -139,8 +139,8 @@ def _check_conditions_single_day(row):
         except Exception:
             pass
 
-        min_threshold = _to_float(cond.get(min_key)) if min_key else None
-        max_threshold = _to_float(cond.get(max_key)) if max_key else None
+        min_threshold = _toFloat(cond.get(min_key)) if min_key else None
+        max_threshold = _toFloat(cond.get(max_key)) if max_key else None
 
         if min_threshold is not None and actual_val < min_threshold:
             return False
@@ -162,31 +162,31 @@ def _check_conditions_single_day(row):
 
     conditions_results = []
     if enable_temperature:
-        conditions_results.append(_within_thresholds(temp_actual, "temp_min", "temp_max"))
-    if enable_precipitation:
-        conditions_results.append(_within_thresholds(precip_actual, "precipitations_min", "precipitations_max"))
-    if enable_wind:
-        conditions_results.append(_within_thresholds(wind_actual, "vitesse_vent_min", "vitesse_vent_max"))
+        conditions_results.append(_withinThresholds(temp_actual, "temp_min", "temp_max"))
+        if enable_precipitation:
+            conditions_results.append(_withinThresholds(precip_actual, "precipitations_min", "precipitations_max"))
+        if enable_wind:
+            conditions_results.append(_withinThresholds(wind_actual, "vitesse_vent_min", "vitesse_vent_max"))
 
     all_ok = all(conditions_results) if conditions_results else True
 
     return all_ok
 
-def _check_conditions_window(df_window: pd.DataFrame, target_date: str = None) -> bool:
+def _checkConditionsWindow(df_window: pd.DataFrame, target_date: str = None) -> bool:
 
     if df_window.empty:
         return False
 
     for idx, row in df_window.iterrows():
-        if not _check_conditions_single_day(row):
+        if not _checkConditionsSingleDay(row):
             return False
 
     return True
 
-def _check_conditions(row):
-    return _check_conditions_single_day(row)
+def _checkConditions(row):
+    return _checkConditionsSingleDay(row)
 
-def evaluate_conditions_window(
+def evaluateConditionsWindow(
     code_postal: str,
     conditions_meteo: dict,
     jours_avant: int = 0,
@@ -211,9 +211,9 @@ def evaluate_conditions_window(
         dates_a_verifier.append(current_date.strftime("%Y-%m-%d"))
         current_date += timedelta(days=1)
 
-    coords = geocode_postal_code(code_postal)
+    coords = geocodePostalCode(code_postal)
     if not coords:
-        return False, _create_error_dataframe(dates_a_verifier, "Géolocalisation impossible")
+        return False, _createErrorDataframe(dates_a_verifier, "Géolocalisation impossible")
 
     lat, lon = coords
 
@@ -222,16 +222,16 @@ def evaluate_conditions_window(
     forecast_days_needed = (end_date_only - today).days + 1
 
     if forecast_days_needed < 0:
-        return False, _create_error_dataframe(dates_a_verifier, "Dates dans le passé")
+        return False, _createErrorDataframe(dates_a_verifier, "Dates dans le passé")
 
     forecast_days = min(max(forecast_days_needed, 1), 16)
 
-    meteo_data = _fetch_all_weather_data(lat, lon, forecast_days)
+    meteo_data = _fetchAllWeatherData(lat, lon, forecast_days)
 
     if not meteo_data:
-        return False, _create_error_dataframe(dates_a_verifier, "Erreur API météo")
+        return False, _createErrorDataframe(dates_a_verifier, "Erreur API météo")
     if jours_avant > 0:
-        historical_data = fetch_past_days_at_noon(
+        historical_data = fetchPastDaysAtNoon(
             lat=lat,
             lon=lon,
             reference_date=reference_date.strftime("%Y-%m-%d"),
@@ -244,7 +244,7 @@ def evaluate_conditions_window(
             meteo_data["precipitations"] = historical_data["precipitation"] + meteo_data["precipitations"]
             meteo_data["wind_speeds"] = historical_data["windspeed_10m"] + meteo_data["wind_speeds"]
             print(f"✅ Données historiques fusionnées: {len(historical_data['time'])} jours passés")
-    df_details = _build_daily_dataframe(
+    df_details = _buildDailyDataframe(
         dates_a_verifier=dates_a_verifier,
         meteo_data=meteo_data,
         conditions_meteo=conditions_meteo,
@@ -261,12 +261,12 @@ def evaluate_conditions_window(
 
     return toutes_conditions_ok, df_details
 
-def _fetch_all_weather_data(lat: float, lon: float, forecast_days: int) -> Optional[Dict]:
+def _fetchAllWeatherData(lat: float, lon: float, forecast_days: int) -> Optional[Dict]:
 
     try:
-        hourly_noon = fetch_noon_temperature(lat, lon, forecast_days)
-        precip_noon = fetch_noon_precipitation(lat, lon, forecast_days) or {}
-        wind_noon = fetch_noon_wind_speed(lat, lon, forecast_days) or {}
+        hourly_noon = fetchNoonTemperature(lat, lon, forecast_days)
+        precip_noon = fetchNoonPrecipitation(lat, lon, forecast_days) or {}
+        wind_noon = fetchNoonWindSpeed(lat, lon, forecast_days) or {}
 
         if not hourly_noon:
             return None
@@ -281,7 +281,7 @@ def _fetch_all_weather_data(lat: float, lon: float, forecast_days: int) -> Optio
         print(f"Erreur lors de la récupération des données météo: {e}")
         return None
 
-def _build_daily_dataframe(
+def _buildDailyDataframe(
     dates_a_verifier: List[str],
     meteo_data: Dict,
     conditions_meteo: Dict,
@@ -330,10 +330,10 @@ def _build_daily_dataframe(
         uv_min = conditions_meteo.get("uv_min")
         uv_max = conditions_meteo.get("uv_max")
 
-        temp_ok = _check_value_in_range(temp, temp_min, temp_max) if enable_temperature else True
-        precip_ok = _check_value_in_range(precip, precip_min, precip_max) if enable_precipitation else True
-        vent_ok = _check_value_in_range(wind, vent_min, vent_max) if enable_wind else True
-        uv_ok = _check_value_in_range(None, uv_min, uv_max) if enable_uv else True
+        temp_ok = _checkValueInRange(temp, temp_min, temp_max) if enable_temperature else True
+        precip_ok = _checkValueInRange(precip, precip_min, precip_max) if enable_precipitation else True
+        vent_ok = _checkValueInRange(wind, vent_min, vent_max) if enable_wind else True
+        uv_ok = _checkValueInRange(None, uv_min, uv_max) if enable_uv else True
 
         conditions_to_check = []
         if enable_temperature:
@@ -369,7 +369,7 @@ def _build_daily_dataframe(
 
     return pd.DataFrame(records)
 
-def _check_value_in_range(
+def _checkValueInRange(
     value: Optional[float],
     min_threshold: Optional[float],
     max_threshold: Optional[float]
@@ -386,11 +386,11 @@ def _check_value_in_range(
 
     return True
 
-def _create_error_dataframe(dates: List[str], error_message: str) -> pd.DataFrame:
+def _createErrorDataframe(dates: List[str], error_message: str) -> pd.DataFrame:
     records = [{"date": d, "erreur": error_message, "conformite_globale": False} for d in dates]
     return pd.DataFrame(records)
 
-def display_weather_check_summary(result: bool, df: pd.DataFrame) -> None:
+def displayWeatherCheckSummary(result: bool, df: pd.DataFrame) -> None:
 
     print("\n" + "="*80)
     print("📊 RÉSULTAT DE LA VÉRIFICATION MÉTÉO SUR FENÊTRE TEMPORELLE")
@@ -437,14 +437,14 @@ if __name__ == "__main__":
     }
 
     print("EXEMPLE 1: Vérification sur J-2 à J+3")
-    resultat, df_details = evaluate_conditions_window(
+    resultat, df_details = evaluateConditionsWindow(
         code_postal="75001",
         conditions_meteo=conditions_bdd,
         jours_avant=2,
         jours_apres=3
     )
 
-    display_weather_check_summary(resultat, df_details)
+    displayWeatherCheckSummary(resultat, df_details)
 
     print("\n\nEXEMPLE 2: Vérification sur J et J+1")
     resultat2, df_details2 = evaluate_conditions_window(
@@ -467,7 +467,7 @@ if __name__ == "__main__":
             print(f"\n[WARNING] Jours NON conformes:")
             print(jours_non_conformes[["date", "jour_relatif", "temp_ok", "precip_ok", "vent_ok", "uv_ok"]])    
 
-def load_user_csv(csv_path: str) -> pd.DataFrame:
+def loadUserCsv(csv_path: str) -> pd.DataFrame:
 
     df = pd.read_csv(csv_path)
     rename_map = {}
@@ -500,13 +500,13 @@ def load_user_csv(csv_path: str) -> pd.DataFrame:
             df["magasin"] = df.get("code_postal", pd.Series([None]*len(df))).astype(str).radd("Magasin-")
 
     if has_wide:
-        def _row_to_conditions(s: pd.Series) -> dict:
+        def _rowToConditions(s: pd.Series) -> dict:
             cond: dict = {}
             for k in wide_threshold_cols:
                 if k in s and pd.notna(s[k]):
                     cond[k] = s[k]
             return cond
-        df["conditions_meteo"] = df.apply(_row_to_conditions, axis=1)
+        df["conditions_meteo"] = df.apply(_rowToConditions, axis=1)
 
     if "magasin" not in df.columns or df["magasin"].isna().all():
         if "mail" in df.columns:
@@ -520,7 +520,7 @@ def load_user_csv(csv_path: str) -> pd.DataFrame:
     if "conditions_meteo" not in df.columns:
         df["conditions_meteo"] = [{} for _ in range(len(df))]
 
-    def _parse_cond(x):
+    def _parseCond(x):
         if isinstance(x, dict):
             return x
         if pd.isna(x):
@@ -540,7 +540,7 @@ def load_user_csv(csv_path: str) -> pd.DataFrame:
         return {}
 
     if not has_wide:
-        df["conditions_meteo"] = df["conditions_meteo"].apply(_parse_cond)
+        df["conditions_meteo"] = df["conditions_meteo"].apply(_parseCond)
 
     if "delai_jours_avant" not in df.columns:
         if "delai_jours" in df.columns:
@@ -578,7 +578,7 @@ def load_user_csv(csv_path: str) -> pd.DataFrame:
     extra_cols = [c for c in df.columns if c not in cols]
     return df[cols + extra_cols]
 
-def decision_maker_daily(DB: pd.DataFrame, target_date: str = None) -> Tuple[dict, pd.DataFrame]:
+def decisionMakerDaily(DB: pd.DataFrame, target_date: str = None) -> Tuple[dict, pd.DataFrame]:
 
     if target_date is None:
         target_date = datetime.now().strftime("%Y-%m-%d")
@@ -612,7 +612,7 @@ def decision_maker_daily(DB: pd.DataFrame, target_date: str = None) -> Tuple[dic
             continue
 
         try:
-            conditions_ok, df_details = evaluate_conditions_window(
+            conditions_ok, df_details = evaluateConditionsWindow(
                 code_postal=code_postal,
                 conditions_meteo=conditions_meteo,
                 jours_avant=delai_jours_avant,
@@ -675,7 +675,7 @@ def decision_maker_daily(DB: pd.DataFrame, target_date: str = None) -> Tuple[dic
 
     return decisions, df_daily
 
-def display_daily_results(decisions: dict, df_daily: pd.DataFrame) -> None:
+def displayDailyResults(decisions: dict, df_daily: pd.DataFrame) -> None:
 
     print("\n" + "="*120)
     print("📊 RÉSULTATS DÉTAILLÉS JOUR PAR JOUR")
@@ -730,7 +730,7 @@ def display_daily_results(decisions: dict, df_daily: pd.DataFrame) -> None:
 
     print("="*120 + "\n")
 
-def export_daily_results(df_daily: pd.DataFrame, filename: str = "resultats_meteo_jour_par_jour.csv"):
+def exportDailyResults(df_daily: pd.DataFrame, filename: str = "resultats_meteo_jour_par_jour.csv"):
 
     df_export = df_daily.copy()
     if 'conditions' in df_export.columns:
@@ -739,7 +739,7 @@ def export_daily_results(df_daily: pd.DataFrame, filename: str = "resultats_mete
     df_export.to_csv(filename, index=False, encoding='utf-8')
     print(f"✅ Résultats exportés dans: {filename}")
 
-def fetch_historical_weather(
+def fetchHistoricalWeather(
     lat: float, 
     lon: float, 
     start_date: str, 
@@ -778,7 +778,7 @@ def fetch_historical_weather(
         print(f"❌ Erreur lors de la récupération des données historiques: {e}")
         return None
 
-def fetch_historical_noon_data(
+def fetchHistoricalNoonData(
     lat: float,
     lon: float,
     start_date: str,
@@ -786,7 +786,7 @@ def fetch_historical_noon_data(
     params: list = None
 ) -> Optional[Dict]:
 
-    hourly_data = fetch_historical_weather(lat, lon, start_date, end_date, params)
+    hourly_data = fetchHistoricalWeather(lat, lon, start_date, end_date, params)
 
     if not hourly_data:
         return None
@@ -810,7 +810,7 @@ def fetch_historical_noon_data(
 
     return noon_data
 
-def fetch_past_days_at_noon(
+def fetchPastDaysAtNoon(
     lat: float,
     lon: float,
     reference_date: str,
@@ -828,7 +828,7 @@ def fetch_past_days_at_noon(
 
     print(f"📅 Récupération données historiques: {start_date} à {end_date} (J-{days_before} à J-1)")
 
-    noon_data = fetch_historical_noon_data(
+    noon_data = fetchHistoricalNoonData(
         lat=lat,
         lon=lon,
         start_date=start_date,

@@ -1,10 +1,13 @@
 {
-  "last_input": "[{\"store_name\":\"Decathlon\",\"postal_code\":\"94230\",\"contact_email\":\"imanebouadilib@gmail.com\",\"analyze_past\":true,\"days_past\":1,\"days_future\":1,\"enable_precipitation\":true,\"wants_rain\":true,\"rain_levels\":[\"strong\"],\"enable_wind\":true,\"wind_type\":\"minimum\",\"wind_value\":\"0\",\"enable_temperature\":true,\"temperature_type\":\"minimum\",\"temperature_value\":\"0\",\"enable_uv\":false,\"uv_min\":\"\"}]",
-  "last_run": "2025-12-22T14:00:20",
-  "state": false,
+  "last_input": "[{\"store_name\": \"magazin1\", \"postal_code\": \"94230\", \"contact_email\": \"khairkhair012@gmail.com\", \"analyze_past\": false, \"days_past\": 0, \"days_future\": 0, \"wants_rain\": false, \"rain_levels\": [], \"wind_type\": \"minimum\", \"wind_value\": \"0.0\", \"temperature_type\": \"minimum\", \"temperature_value\": \"0\", \"uv_min\": \"\", \"enable_temperature\": false, \"enable_precipitation\": false, \"enable_wind\": true, \"enable_uv\": false}, {\"store_name\": \"magasin 2\", \"postal_code\": \"94230\", \"contact_email\": \"khairkhair012@gmail.com\", \"analyze_past\": false, \"days_past\": 0, \"days_future\": 0, \"wants_rain\": false, \"rain_levels\": [], \"wind_type\": \"minimum\", \"wind_value\": \"0\", \"temperature_type\": \"maximum\", \"temperature_value\": \"0.0\", \"uv_min\": \"\", \"enable_temperature\": true, \"enable_precipitation\": false, \"enable_wind\": false, \"enable_uv\": false}, {\"store_name\": \"magazin3\", \"postal_code\": \"nan\", \"contact_email\": \"khairkhair012@gmail.com\", \"analyze_past\": false, \"days_past\": 0, \"days_future\": 0, \"wants_rain\": false, \"rain_levels\": [], \"wind_type\": \"maximum\", \"wind_value\": \"0.0\", \"temperature_type\": \"minimum\", \"temperature_value\": \"0\", \"uv_min\": \"\", \"enable_temperature\": false, \"enable_precipitation\": false, \"enable_wind\": true, \"enable_uv\": false}]",
+  "last_run": "2025-12-31T14:22:14",
+  "state": true,
   "failure_counters": {
     "khair Bouadi (94230)": 7,
     "mof (94800)": 1,
-    "Decathlon (94230)": 2
+    "Decathlon (94230)": 2,
+    "magasin 2 (94230)": 4,
+    "magazin3 (nan)": 2,
+    "Bouadi Kheireddine (60000)": 1
   }
 }
